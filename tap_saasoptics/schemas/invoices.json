@@ -1,0 +1,319 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "applied_amount": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "auditentry_created": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "auditentry_created_by_name": {
+      "type": "string"
+    },
+    "auditentry_modified": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "auditentry_modified_by_name": {
+      "type": "string"
+    },
+    "auditentry_qb_created": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "auditentry_qb_modified": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "avatax_commit_timestamp": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "avatax_id": {
+      "type": ["null", "string"]
+    },
+    "avatax_modify_timestamp": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "avatax_reconciliation_status": {
+      "type": ["null", "string"]
+    },
+    "avatax_status": {
+      "type": ["null", "string"]
+    },
+    "balance": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "billing_addr1": {
+      "type": ["null", "string"]
+    },
+    "billing_addr2": {
+      "type": ["null", "string"]
+    },
+    "billing_addr3": {
+      "type": ["null", "string"]
+    },
+    "billing_city": {
+      "type": ["null", "string"]
+    },
+    "billing_country": {
+      "type": ["null", "string"]
+    },
+    "billing_state": {
+      "type": ["null", "string"]
+    },
+    "billing_zip_code": {
+      "type": ["null", "string"]
+    },
+    "contract": {
+      "type": ["null", "integer"]
+    },
+    "date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "deleted_in_qb": {
+      "type": ["null", "boolean"]
+    },
+    "do_not_sync": {
+      "type": ["null", "boolean"]
+    },
+    "due_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "ei_theme": {
+      "type": ["null", "string"]
+    },
+    "email_from_so": {
+      "type": ["null", "boolean"]
+    },
+    "enable_ach_payment": {
+      "type": ["null", "boolean"]
+    },
+    "enable_cc_payment": {
+      "type": ["null", "boolean"]
+    },
+    "exported_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "external_id": {
+      "type": ["null", "string"]
+    },
+    "foreign_exchange_rate": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "id": {
+      "type": ["null", "integer"]
+    },
+    "ignore_date_when_syncing": {
+      "type": ["null", "boolean"]
+    },
+    "is_paid": {
+      "type": ["null", "boolean"]
+    },
+    "line_items": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "deleted_in_qb": {
+                "type": ["null", "boolean"]
+              },
+              "exported_date": {
+                "type": ["null", "string"],
+                "format": "date-time"
+              },
+              "external_id": {
+                "type": ["null", "string"]
+              },
+              "home_amount": {
+                "type": ["null", "number"],
+                "multipleOf": 1e-10
+              },
+              "id": {
+                "type": ["null", "integer"]
+              },
+              "invoice": {
+                "type": ["null", "integer"]
+              },
+              "item": {
+                "type": ["null", "integer"]
+              },
+              "local_amount": {
+                "type": ["null", "number"],
+                "multipleOf": 1e-10
+              },
+              "modified": {
+                "type": ["null", "string"],
+                "format": "date-time"
+              },
+              "no_transaction_permitted": {
+                "type": ["null", "boolean"]
+              },
+              "notes": {
+                "type": ["null", "string"]
+              },
+              "number": {
+                "type": ["null", "string"]
+              },
+              "qb_class": {
+                "type": ["null", "integer"]
+              },
+              "qb_time_modified": {
+                "type": ["null", "string"],
+                "format": "date-time"
+              },
+              "qb_txn_line_id": {
+                "type": ["null", "string"]
+              },
+              "quantity": {
+                "type": ["null", "number"],
+                "multipleOf": 1e-10
+              },
+              "recurly_id": {
+                "type": ["null", "string"]
+              },
+              "refund_of": {
+                "type": ["null", "string"]
+              },
+              "refund_of_stripe_id": {
+                "type": ["null", "string"]
+              },
+              "sf_id": {
+                "type": ["null", "string"]
+              },
+              "stripe_id": {
+                "type": ["null", "string"]
+              },
+              "sync_date": {
+                "type": ["null", "string"],
+                "format": "date-time"
+              },
+              "transaction": {
+                "type": ["null", "integer"]
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "memo": {
+      "type": ["null", "string"]
+    },
+    "number": {
+      "type": ["null", "string"]
+    },
+    "other": {
+      "type": ["null", "string"]
+    },
+    "po_number": {
+      "type": ["null", "string"]
+    },
+    "qb_ar_account": {
+      "type": ["null", "string"]
+    },
+    "qb_class": {
+      "type": ["null", "string"]
+    },
+    "qb_currency": {
+      "type": ["null", "string"]
+    },
+    "qb_customer_message": {
+      "type": ["null", "string"]
+    },
+    "qb_number": {
+      "type": ["null", "string"]
+    },
+    "qb_payment_terms": {
+      "type": ["null", "integer"]
+    },
+    "qb_sales_rep": {
+      "type": ["null", "string"]
+    },
+    "qb_template": {
+      "type": ["null", "string"]
+    },
+    "qb_txn_id": {
+      "type": ["null", "string"]
+    },
+    "recurly_id": {
+      "type": ["null", "string"]
+    },
+    "refund_of": {
+      "type": ["null", "string"]
+    },
+    "sales_tax": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "sales_tax_percentage": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "sf_id": {
+      "type": ["null", "string"]
+    },
+    "ship_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "shipping_addr1": {
+      "type": ["null", "string"]
+    },
+    "shipping_addr2": {
+      "type": ["null", "string"]
+    },
+    "shipping_addr3": {
+      "type": ["null", "string"]
+    },
+    "shipping_city": {
+      "type": ["null", "string"]
+    },
+    "shipping_country": {
+      "type": ["null", "string"]
+    },
+    "shipping_state": {
+      "type": ["null", "string"]
+    },
+    "shipping_zip_code": {
+      "type": ["null", "string"]
+    },
+    "stripe_id": {
+      "type": ["null", "string"]
+    },
+    "stripe_refund_id": {
+      "type": ["null", "string"]
+    },
+    "subtotal": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-10
+    },
+    "sync_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "to_be_emailed": {
+      "type": ["null", "boolean"]
+    },
+    "to_be_printed": {
+      "type": ["null", "boolean"]
+    },
+    "type": {
+      "type": ["null", "string"]
+    }
+  }
+}
