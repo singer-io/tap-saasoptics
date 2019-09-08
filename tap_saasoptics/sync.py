@@ -80,7 +80,7 @@ def process_records(catalog, #pylint: disable=too-many-branches
                                                stream_metadata)
 
                 # Reset max_bookmark_value to new value if higher
-                if bookmark_field and (bookmark_field in transformed_record):
+                if transformed_record.get(bookmark_field):
                     if (max_bookmark_value is None) or \
                         (transformed_record[bookmark_field] > max_bookmark_value):
                         max_bookmark_value = transformed_record[bookmark_field]
@@ -140,7 +140,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
     # windowing: loop through date days_interval date windows from last_datetime to now_datetime
     now_datetime = utils.now()
     if bookmark_query_field_from and bookmark_query_field_to:
-        days_interval = 30
+        days_interval = 60
         start_window = strptime_to_utc(last_datetime)
         end_window = start_window + timedelta(days=days_interval)
         if end_window > now_datetime:
@@ -148,13 +148,14 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
     else:
         start_window = strptime_to_utc(last_datetime)
         end_window = now_datetime
-        diff_secs = end_window - start_window
+        diff_sec = (end_window - start_window).seconds
+        LOGGER.info('diff_sec: {}, type: {}'.format(diff_sec, type(diff_sec)))
         days_interval = math.ceil(diff_sec / (3600 * 24)) # round-up difference to days
     while not start_window == now_datetime:
         LOGGER.info('START Sync for Stream: {}{}'.format(
             stream_name,
             ', Date window from: {} to {}'.format(start_window, end_window) \
-                if bookmark_query_field else ''))
+                if bookmark_query_field_from else ''))
         params = static_params # adds in endpoint specific, sort, filter params
         if bookmark_query_field_from:
             # For datetime bookmark_type, tap allows from/to date window
@@ -178,9 +179,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 querystring = '&'.join(['%s=%s' % (key, value) for (key, value) in params.items()])
             else:
                 querystring = None
-            LOGGER.info('URL for Stream {}: {}{}'.format(
+            LOGGER.info('URL for Stream {}: {}{}{}'.format(
                 stream_name,
                 next_url,
+                '/' if page == 1 else '',
                 '?{}'.format(querystring) if querystring else ''))
 
             # API request data
@@ -224,7 +226,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 last_integer=last_integer,
                 parent=parent,
                 parent_id=parent_id)
-            LOGGER.info('Stream {}, records processed for page: {}'.format(
+            LOGGER.info('Stream {}, batch processed {} records'.format(
                 stream_name, record_count))
 
             # set total_records and next_url for pagination
@@ -258,6 +260,8 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                                     .format(child_stream_name, stream_name, parent_id))
                             child_path = child_endpoint_config.get(
                                 'path', child_stream_name).format(str(parent_id))
+                            child_bookmark_field = next(iter(child_endpoint_config.get(
+                                'replication_keys', [])), None)
                             child_total_records = sync_endpoint(
                                 client=client,
                                 catalog=catalog,
@@ -271,7 +275,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                                     'bookmark_query_field_from'),
                                 bookmark_query_field_to=child_endpoint_config.get(
                                     'bookmark_query_field_to'),
-                                bookmark_field=child_endpoint_config.get('replication_keys', [])[0],
+                                bookmark_field=child_bookmark_field,
                                 bookmark_type=child_endpoint_config.get('bookmark_type'),
                                 data_key=child_endpoint_config.get('data_key', 'results'),
                                 id_fields=child_endpoint_config.get('key_properties'),
@@ -373,6 +377,7 @@ def sync(client, config, catalog, state):
             LOGGER.info('START Syncing: {}'.format(stream_name))
             update_currently_syncing(state, stream_name)
             path = endpoint_config.get('path', stream_name)
+            bookmark_field = next(iter(endpoint_config.get('replication_keys', [])), None)
             total_records = sync_endpoint(
                 client=client,
                 catalog=catalog,
@@ -384,7 +389,7 @@ def sync(client, config, catalog, state):
                 static_params=endpoint_config.get('params', {}),
                 bookmark_query_field_from=endpoint_config.get('bookmark_query_field_from'),
                 bookmark_query_field_to=endpoint_config.get('bookmark_query_field_to'),
-                bookmark_field=endpoint_config.get('replication_keys', [])[0],
+                bookmark_field=bookmark_field,
                 bookmark_type=endpoint_config.get('bookmark_type'),
                 data_key=endpoint_config.get('data_key', 'results'),
                 id_fields=endpoint_config.get('key_properties'))
