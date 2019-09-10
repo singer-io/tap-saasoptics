@@ -6,7 +6,7 @@
       "type": ["null", "string"]
     },
     "billing_profile": {
-      "type": "object",
+      "type": ["null", "object"],
       "additionalProperties": false,
       "properties": {
         "account_number": {

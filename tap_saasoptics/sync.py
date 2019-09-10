@@ -75,14 +75,15 @@ def process_records(catalog, #pylint: disable=too-many-branches
 
             # Transform record for Singer.io
             with Transformer() as transformer:
-                transformed_record = transformer.transform(record,
-                                               schema,
-                                               stream_metadata)
+                transformed_record = transformer.transform(
+                    record,
+                    schema,
+                    stream_metadata)
 
                 # Reset max_bookmark_value to new value if higher
                 if transformed_record.get(bookmark_field):
-                    if (max_bookmark_value is None) or \
-                        (transformed_record[bookmark_field] > max_bookmark_value):
+                    if max_bookmark_value is None or \
+                        transformed_record[bookmark_field] > transform_datetime(max_bookmark_value):
                         max_bookmark_value = transformed_record[bookmark_field]
 
                 if bookmark_field and (bookmark_field in transformed_record):
@@ -149,7 +150,6 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         start_window = strptime_to_utc(last_datetime)
         end_window = now_datetime
         diff_sec = (end_window - start_window).seconds
-        LOGGER.info('diff_sec: {}, type: {}'.format(diff_sec, type(diff_sec)))
         days_interval = math.ceil(diff_sec / (3600 * 24)) # round-up difference to days
     while not start_window == now_datetime:
         LOGGER.info('START Sync for Stream: {}{}'.format(

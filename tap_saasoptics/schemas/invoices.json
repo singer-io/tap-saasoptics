@@ -124,7 +124,7 @@
         {
           "type": "array",
           "items": {
-            "type": "object",
+            "type": ["null", "object"],
             "additionalProperties": false,
             "properties": {
               "deleted_in_qb": {

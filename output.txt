@@ -1,0 +1,17 @@
+Checking stdin for valid Singer-formatted data
+The output is valid.
+It contained 1872 messages for 4 streams.
+
+      4 schema messages
+   1840 record messages
+     28 state messages
+
+Details by stream:
++-----------------+---------+---------+
+| stream          | records | schemas |
++-----------------+---------+---------+
+| revenue_entries | 1459    | 1       |
+| accounts        | 356     | 1       |
+| contracts       | 0       | 1       |
+| invoices        | 25      | 1       |
++-----------------+---------+---------+
