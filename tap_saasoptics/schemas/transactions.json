@@ -16,8 +16,11 @@
       "type": ["null", "string"],
       "format": "date-time"
     },
-    "auditentry__modified_by_name": {
+    "auditentry_modified_by_name": {
       "type": ["null", "string"]
+    },
+    "automatically_update_revenue": {
+      "type": ["null", "boolean"]
     },
     "autorenewal_profile": {
       "type": ["null", "integer"]
@@ -32,8 +35,7 @@
       "type": ["null", "integer"]
     },
     "conversion": {
-      "type": ["null", "number"],
-      "multipleOf": 1e-10
+      "type": ["null", "string"]
     },
     "crm_opportunity_id": {
       "type": ["null", "string"]
@@ -48,15 +50,14 @@
       "type": ["null", "boolean"]
     },
     "duration": {
-      "type": ["null", "number"],
-      "multipleOf": 1e-10
+      "type": ["null", "string"]
     },
     "end_date": {
       "type": ["null", "string"],
       "format": "date-time"
     },
     "flagged": {
-      "type": ["null", "boolean"]
+      "type": ["null", "string"]
     },
     "foreign_exchange_rate": {
       "type": ["null", "number"],
@@ -124,6 +125,9 @@
       "type": ["null", "string"],
       "format": "date-time"
     },
+    "monthyear": {
+      "type": ["null", "string"]
+    },
     "notes": {
       "type": ["null", "string"]
     },
@@ -146,7 +150,7 @@
       "type": ["null", "string"]
     },
     "project": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "quantity": {
       "type": ["null", "number"],
@@ -159,7 +163,7 @@
       "type": ["null", "boolean"]
     },
     "renew_using_item": {
-      "type": "null"
+      "type": ["null", "integer"]
     },
     "renewal_amount": {
       "type": ["null", "number"],
@@ -174,12 +178,10 @@
       "multipleOf": 1e-10
     },
     "renewal_duration": {
-      "type": ["null", "number"],
-      "multipleOf": 1e-10
+      "type": ["null", "string"]
     },
     "renewal_factor": {
-      "type": ["null", "number"],
-      "multipleOf": 1e-10
+      "type": ["null", "integer"]
     },
     "renewal_of_set": {
       "anyOf": [
@@ -239,7 +241,7 @@
       "format": "date-time"
     },
     "term_number": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "text_field1": {
       "type": ["null", "string"]

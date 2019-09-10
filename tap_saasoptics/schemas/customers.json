@@ -38,7 +38,7 @@
           "type": ["null", "string"]
         },
         "contact": {
-          "type": ["null", "integer"]
+          "type": ["null", "string"]
         },
         "country": {
           "type": ["null", "string"]
@@ -47,16 +47,16 @@
           "type": ["null", "integer"]
         },
         "customer_type": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "default_class": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "default_credit_memo_template": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "default_invoice_template": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "edit_sequence": {
           "type": ["null", "string"]
@@ -65,12 +65,15 @@
           "type": ["null", "string"]
         },
         "entity_use_code": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "fax": {
           "type": ["null", "string"]
         },
         "first_name": {
+          "type": ["null", "string"]
+        },
+        "full_name": {
           "type": ["null", "string"]
         },
         "invoice_email_preference": {
@@ -83,8 +86,7 @@
           "type": ["null", "boolean"]
         },
         "item_sales_tax": {
-          "type": ["null", "number"],
-          "multipleOf": 1e-10
+          "type": ["null", "integer"]
         },
         "last_name": {
           "type": ["null", "string"]
@@ -96,7 +98,7 @@
           "type": ["null", "string"]
         },
         "payment_method": {
-          "type": ["null", "string"]
+          "type": ["null", "integer"]
         },
         "payment_terms": {
           "type": ["null", "integer"]
@@ -170,7 +172,7 @@
       "type": ["null", "boolean"]
     },
     "default_theme": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "do_not_sync": {
       "type": ["null", "boolean"]
@@ -180,6 +182,9 @@
     },
     "email": {
       "type": ["null", "string"]
+    },
+    "enable_autopay": {
+      "type": ["null", "boolean"]
     },
     "escalation_email": {
       "type": ["null", "string"]
@@ -234,7 +239,7 @@
       "type": ["null", "string"]
     },
     "sf_default_renewal_opportunity_rule": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "sf_id": {
       "type": ["null", "string"]

@@ -88,7 +88,7 @@
       "format": "date-time"
     },
     "ei_theme": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "email_from_so": {
       "type": ["null", "boolean"]
@@ -185,7 +185,7 @@
                 "type": ["null", "string"]
               },
               "refund_of": {
-                "type": ["null", "string"]
+                "type": ["null", "integer"]
               },
               "refund_of_stripe_id": {
                 "type": ["null", "string"]
@@ -224,16 +224,16 @@
       "type": ["null", "string"]
     },
     "qb_ar_account": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_class": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_currency": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_customer_message": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_number": {
       "type": ["null", "string"]
@@ -242,10 +242,10 @@
       "type": ["null", "integer"]
     },
     "qb_sales_rep": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_template": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "qb_txn_id": {
       "type": ["null", "string"]
@@ -254,7 +254,7 @@
       "type": ["null", "string"]
     },
     "refund_of": {
-      "type": ["null", "string"]
+      "type": ["null", "integer"]
     },
     "sales_tax": {
       "type": ["null", "number"],

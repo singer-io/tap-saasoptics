@@ -39,9 +39,10 @@ def convert_string_to_float_array(arr):
 
 # Convert string numbers to float for a nested dict with lists
 def convert_string_to_float_dict(this_dict):
-    key_endings = ('_amount', '_rate', '_tax', 'percentage', 'subtotal', 'factor', 'probability',
-                   'qantity', 'duration', 'balance', 'number_field1', 'number_field2',
+    key_endings = ('_amount', '_rate', 'percentage', 'subtotal', 'probability',
+                   'qantity', 'balance', 'number_field1', 'number_field2',
                    'number_field3')
+                   # '_tax', 'factor'?
     new_dict = {}
     for key, val in this_dict.items():
         if isinstance(this_dict[key], str) and key.endswith(key_endings):

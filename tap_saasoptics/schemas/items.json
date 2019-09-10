@@ -32,6 +32,9 @@
     "enable_create_transactions": {
       "type": ["null", "boolean"]
     },
+    "enforce_start_date_after_end_date": {
+      "type": ["null", "boolean"]
+    },
     "gl_created": {
       "type": ["null", "string"],
       "format": "date-time"
@@ -109,6 +112,9 @@
     "qb_id": {
       "type": ["null", "string"]
     },
+    "qb_only": {
+      "type": ["null", "boolean"]
+    },
     "qb_sales_tax_code": {
       "type": ["null", "string"]
     },
@@ -116,6 +122,12 @@
       "type": ["null", "string"]
     },
     "recurring": {
+      "type": ["null", "boolean"]
+    },
+    "renew_all_open_transactions": {
+      "type": ["null", "boolean"]
+    },
+    "renew_using_same_item": {
       "type": ["null", "boolean"]
     },
     "revenue_recognition_method": {
@@ -132,6 +144,14 @@
     },
     "sync_invoices": {
       "type": ["null", "boolean"]
+    },
+    "transaction_end_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "transaction_start_date": {
+      "type": ["null", "string"],
+      "format": "date-time"
     },
     "wizard_enabled": {
       "type": ["null", "boolean"]

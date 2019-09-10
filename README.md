@@ -149,7 +149,7 @@ This tap:
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
-[sales_orders](https://saasoptics.zendesk.com/hc/en-us/articles/360000738813-Sales-Orders-CR-)
+[sales_orders](https://saasoptics.zendesk.com/hc/en-us/articles/360000738813-Sales-Orders-CR-) and [sales_order_line_items](https://saasoptics.zendesk.com/hc/en-us/articles/360000751354)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/sales_orders/
 - Primary key fields: id
 - Foreign key fields: 

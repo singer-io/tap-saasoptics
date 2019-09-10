@@ -25,7 +25,8 @@
       "type": ["null", "string"]
     },
     "num_days": {
-      "type": ["null", "string"]
+      "type": ["null", "number"],
+      "multipleOf": 1e-0
     }
   }
 }
