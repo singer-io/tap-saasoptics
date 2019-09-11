@@ -422,7 +422,7 @@
                 "multipleOf": 1e-10
               },
               "transaction_billing_method": {
-                "type": ["null", "integer"]
+                "type": ["null", "string"]
               },
               "transaction_conversion": {
                 "type": ["null", "string"]

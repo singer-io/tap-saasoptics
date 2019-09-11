@@ -1,3 +1,13 @@
+# Remove keys for none/null values
+def clean_empty(this_dict):
+    if not isinstance(this_dict, (dict, list)):
+        return this_dict
+    if isinstance(this_dict, list):
+        return [val for val in (clean_empty(val) for val in this_dict) if val]
+    return {key: val for key, val in ((key, clean_empty(val)) for key, val in \
+        this_dict.items()) if val}
+
+
 # de-nest auditentry with auditentry__ prefix for: invoices, transactions
 def denest_auditentry(this_json, path):
     new_json = this_json
@@ -54,8 +64,11 @@ def convert_string_to_float_dict(this_dict):
 # Run all transforms: convert string numbers to float and
 #  de-nest auditentry node for invoices and transactions
 def transform_json(this_json, stream, path):
-    new_json = convert_string_to_float_dict(this_json)
+    new_json = convert_string_to_float_dict(clean_empty(this_json))
     if stream in ('invoices', 'transactions'):
         denested_json = denest_auditentry(new_json, path)
         new_json = denested_json
-    return new_json[path]
+    if path in new_json:
+        return new_json[path]
+    else:
+        return None
