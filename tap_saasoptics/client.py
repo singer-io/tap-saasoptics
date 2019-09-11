@@ -1,7 +1,7 @@
 import backoff
 import requests
 from requests.exceptions import ConnectionError
-from singer import metrics, utils
+from singer import metrics
 import singer
 
 API_VERSION = 'v1.0'

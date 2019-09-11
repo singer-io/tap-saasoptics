@@ -3,7 +3,7 @@
 #   <root node>: Plural stream name for the endpoint
 #   path: API endpoint relative path, when added to the base URL, creates the full path
 #   key_properties: Primary key from the Parent stored when store_ids is true.
-#   replication_method: 
+#   replication_method:
 #   replication_keys: bookmark_field(s), typically a date-time, used for filtering the results
 #        and setting the state
 #   params: Query, sort, and other endpoint specific parameters
@@ -106,5 +106,5 @@ STREAMS = {
     'sales_orders': {
         'key_properties': ['id'],
         'replication_method': 'FULL_TABLE'
-    }    
+    }
 }

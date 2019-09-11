@@ -248,7 +248,7 @@ This tap:
     ```
     Pylint test resulted in the following score:
     ```bash
-    TBD
+    Your code has been rated at 9.83/10
     ```
 
     To [check the tap](https://github.com/singer-io/singer-tools#singer-check-tap) and verify working:

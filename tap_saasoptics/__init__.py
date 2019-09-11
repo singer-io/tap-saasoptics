@@ -33,9 +33,9 @@ def main():
     parsed_args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
     with SaaSOpticsClient(parsed_args.config['token'],
-                     parsed_args.config['account_name'],
-                     parsed_args.config['server_subdomain'],
-                     parsed_args.config['user_agent']) as client:
+                          parsed_args.config['account_name'],
+                          parsed_args.config['server_subdomain'],
+                          parsed_args.config['user_agent']) as client:
 
         state = {}
         if parsed_args.state:

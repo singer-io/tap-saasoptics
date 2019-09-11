@@ -1,7 +1,3 @@
-import re
-from re import sub
-
-
 # de-nest auditentry with auditentry__ prefix for: invoices, transactions
 def denest_auditentry(this_json, path):
     new_json = this_json
@@ -20,10 +16,9 @@ def string_to_float(val):
         new_val = float(val)
         return new_val
     except ValueError:
-        
         return None
 
-    
+
 # Loop through arrays for converting string number to float
 def convert_string_to_float_array(arr):
     new_arr = []

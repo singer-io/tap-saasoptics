@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 import math
 import singer
 from singer import metrics, metadata, Transformer, utils
@@ -90,14 +90,16 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     if bookmark_type == 'integer':
                         # Keep only records whose bookmark is after the last_integer
                         if transformed_record[bookmark_field] >= last_integer:
-                            write_record(stream_name, transformed_record, time_extracted=time_extracted)
+                            write_record(stream_name, transformed_record, \
+                                time_extracted=time_extracted)
                             counter.increment()
                     elif bookmark_type == 'datetime':
                         last_dttm = transform_datetime(last_datetime)
                         bookmark_dttm = transform_datetime(transformed_record[bookmark_field])
                         # Keep only records whose bookmark is after the last_datetime
                         if bookmark_dttm >= last_dttm:
-                            write_record(stream_name, transformed_record, time_extracted=time_extracted)
+                            write_record(stream_name, transformed_record, \
+                                time_extracted=time_extracted)
                             counter.increment()
                 else:
                     write_record(stream_name, transformed_record, time_extracted=time_extracted)
@@ -173,7 +175,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         next_url = '{}/{}'.format(client.base_url, path)
         offset = 0
         limit = 100 # Default limit for SaaSOptics API, unable to change this in v1.0
-        while next_url is not None: 
+        while next_url is not None:
             # Squash params to query-string params
             if page == 1 and not params == {}:
                 querystring = '&'.join(['%s=%s' % (key, value) for (key, value) in params.items()])
@@ -396,5 +398,5 @@ def sync(client, config, catalog, state):
 
             update_currently_syncing(state, None)
             LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(
-                            stream_name, 
-                            total_records))
+                stream_name,
+                total_records))
