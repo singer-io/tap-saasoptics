@@ -184,15 +184,8 @@
       "type": ["null", "integer"]
     },
     "renewal_of_set": {
-      "anyOf": [
-        {
-          "type": "array"
-
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "type": ["null", "array"],
+      "items": {}
     },
     "renewal_probability": {
       "type": ["null", "number"],
