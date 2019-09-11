@@ -203,14 +203,14 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
 
             # Transform data with transform_json from transform.py
             # The data_key identifies the array/list of records below the <root> element
-            # LOGGER.info('data = {}'.format(data)) # TESTING, comment out
+            LOGGER.info('data = {}'.format(data)) # TESTING, comment out
             transformed_data = [] # initialize the record list
             # If a single record dictionary, append to a list[]
             if data_key is None:
                 transformed_data = transform_json(data, stream_name, 'results')
             elif data_key in data:
                 transformed_data = transform_json(data, stream_name, data_key)
-            # LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
+            LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
             if not transformed_data or transformed_data is None:
                 total_records = 0
                 return total_records # No data results

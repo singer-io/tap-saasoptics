@@ -76,7 +76,7 @@ STREAMS = {
         'replication_method': 'FULL_TABLE'
     },
     'currency_codes': {
-        'key_properties': ['id'],
+        'key_properties': ['code'],
         'replication_method': 'FULL_TABLE'
     },
     'payment_terms': {
