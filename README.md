@@ -53,7 +53,7 @@ This tap:
 - Primary key fields: id
 - Foreign key fields: 
 - Replication strategy: INCREMENTAL (query filtered)
-  - Bookmark query fields: modified__gte, modified__lte
+  - Bookmark query fields: auditentry__modified__gte, auditentry__modified__lte
   - Bookmark: modified (date-time)
 - Transformations: none
 
@@ -71,7 +71,7 @@ This tap:
 - Primary key fields: id
 - Foreign key fields: 
 - Replication strategy: INCREMENTAL (query filtered)
-  - Bookmark query fields: modified__gte, modified__lte
+  - Bookmark query fields: auditentry__modified__gte, auditentry__modified__lte
   - Bookmark: modified (date-time)
 - Transformations: none
 
@@ -112,7 +112,7 @@ This tap:
 
 [currency_codes](https://saasoptics.zendesk.com/hc/en-us/articles/115003604473-Currency-Codes-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/currency_codes/
-- Primary key fields: id
+- Primary key fields: code
 - Foreign key fields: 
 - Replication strategy: FULL_TABLE
 - Transformations: none
@@ -259,7 +259,33 @@ This tap:
     Check tap resulted in the following:
     ```bash
     The output is valid.
-    TBD
+    It contained 8240 messages for 16 streams.
+
+        16 schema messages
+    8108 record messages
+        116 state messages
+
+    Details by stream:
+    +-----------------------------+---------+---------+
+    | stream                      | records | schemas |
+    +-----------------------------+---------+---------+
+    | billing_methods             | 23      | 1       |
+    | contracts                   | 49      | 1       |
+    | sales_orders                | 223     | 1       |
+    | auto_renewal_profiles       | 6       | 1       |
+    | invoices                    | 182     | 1       |
+    | payment_terms               | 15      | 1       |
+    | currency_codes              | 153     | 1       |
+    | customers                   | 190     | 1       |
+    | billing_descriptions        | 8       | 1       |
+    | transactions                | 550     | 1       |
+    | registers                   | 0       | 1       |
+    | accounts                    | 356     | 1       |
+    | country_codes               | 250     | 1       |
+    | revenue_recognition_methods | 27      | 1       |
+    | revenue_entries             | 6003    | 1       |
+    | items                       | 73      | 1       |
+    +-----------------------------+---------+---------+
     ```
 ---
 

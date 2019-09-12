@@ -153,7 +153,9 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         end_window = now_datetime
         diff_sec = (end_window - start_window).seconds
         days_interval = math.ceil(diff_sec / (3600 * 24)) # round-up difference to days
-    while not start_window == now_datetime:
+    endpoint_total = 0
+    total_records = 0
+    while start_window < now_datetime:
         LOGGER.info('START Sync for Stream: {}{}'.format(
             stream_name,
             ', Date window from: {} to {}'.format(start_window, end_window) \
@@ -175,6 +177,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         next_url = '{}/{}'.format(client.base_url, path)
         offset = 0
         limit = 100 # Default limit for SaaSOptics API, unable to change this in v1.0
+        total_records = 0
         while next_url is not None:
             # Squash params to query-string params
             if page == 1 and not params == {}:
@@ -199,21 +202,22 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
             time_extracted = utils.now()
             if not data or data is None or data == {}:
                 total_records = 0
-                return total_records # No data results
+                break # No data results
 
             # Transform data with transform_json from transform.py
             # The data_key identifies the array/list of records below the <root> element
-            LOGGER.info('data = {}'.format(data)) # TESTING, comment out
+            # LOGGER.info('data = {}'.format(data)) # TESTING, comment out
             transformed_data = [] # initialize the record list
             # If a single record dictionary, append to a list[]
             if data_key is None:
                 transformed_data = transform_json(data, stream_name, 'results')
             elif data_key in data:
                 transformed_data = transform_json(data, stream_name, data_key)
-            LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
+            # LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
             if not transformed_data or transformed_data is None:
+                LOGGER.info('No transformed data for data = {}'.format(data)) 
                 total_records = 0
-                return total_records # No data results
+                break # No data results
 
             # Process records and get the max_bookmark_value and record_count for the set of records
             max_bookmark_value, record_count = process_records(
@@ -313,9 +317,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
             end_window = now_datetime
         else:
             end_window = next_end_window
+        endpoint_total = endpoint_total + total_records
 
-    # Return total_records across all batches
-    return total_records
+    # Return endpoint_total across all batches
+    return endpoint_total
 
 
 # Review catalog and make a list of selected streams

@@ -1,4 +1,4 @@
-# Remove keys for none/null values
+# Remove key nodes for none/null values
 def clean_empty(this_dict):
     if not isinstance(this_dict, (dict, list)):
         return this_dict
@@ -12,7 +12,7 @@ def clean_empty(this_dict):
 def denest_auditentry(this_json, path):
     new_json = this_json
     i = 0
-    for record in list(this_json[path]):
+    for record in list(this_json.get(path, [])):
         if 'auditentry' in record:
             for key, val in record['auditentry'].copy().items():
                 new_json[path][i]['auditentry_{}'.format(key)] = val
