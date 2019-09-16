@@ -1,19 +1,18 @@
 # streams: API URL endpoints to be called
 # properties:
 #   <root node>: Plural stream name for the endpoint
-#   path: API endpoint relative path, when added to the base URL, creates the full path
-#   key_properties: Primary key from the Parent stored when store_ids is true.
-#   replication_method:
+#   path: API endpoint relative path, when added to the base URL, creates the full path,
+#       default = stream_name
+#   key_properties: Primary key fields for identifying an endpoint record.
+#   replication_method: INCREMENTAL or FULL_TABLE
 #   replication_keys: bookmark_field(s), typically a date-time, used for filtering the results
 #        and setting the state
-#   params: Query, sort, and other endpoint specific parameters
-#   data_key: JSON element containing the records for the endpoint
+#   params: Query, sort, and other endpoint specific parameters; default = {}
+#   data_key: JSON element containing the results list for the endpoint; default = 'results'
 #   bookmark_query_field_from: From date-time field used for filtering the query
 #   bookmark_query_field_to: To date-time field used for filtering the query
 #   bookmark_type: Data type for bookmark, integer or datetime
-#   children: A collection of child endpoints (where the endpoint path includes the parent id)
-#   parent: On each of the children, the singular stream name for parent element
-#   NOT USED for this tap's endpoints: path, params, data_key, children, parent
+
 STREAMS = {
     'customers': {
         'key_properties': ['id'],

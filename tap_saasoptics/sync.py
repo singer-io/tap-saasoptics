@@ -21,7 +21,7 @@ def write_schema(catalog, stream_name):
 
 def write_record(stream_name, record, time_extracted):
     try:
-        singer.write_record(stream_name, record, time_extracted=time_extracted)
+        singer.messages.write_record(stream_name, record, time_extracted=time_extracted)
     except OSError as err:
         LOGGER.info('OS Error writing record for: {}'.format(stream_name))
         LOGGER.info('record: {}'.format(record))
@@ -60,19 +60,13 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     bookmark_type=None,
                     max_bookmark_value=None,
                     last_datetime=None,
-                    last_integer=None,
-                    parent=None,
-                    parent_id=None):
+                    last_integer=None):
     stream = catalog.get_stream(stream_name)
     schema = stream.schema.to_dict()
     stream_metadata = metadata.to_map(stream.metadata)
 
     with metrics.record_counter(stream_name) as counter:
         for record in records:
-            # If child object, add parent_id to record
-            if parent_id and parent:
-                record[parent + '_id'] = parent_id
-
             # Transform record for Singer.io
             with Transformer() as transformer:
                 transformed_record = transformer.transform(
@@ -108,7 +102,7 @@ def process_records(catalog, #pylint: disable=too-many-branches
         return max_bookmark_value, counter.value
 
 
-# Sync a specific parent or child endpoint.
+# Sync a specific endpoint
 def sync_endpoint(client, #pylint: disable=too-many-branches
                   catalog,
                   state,
@@ -123,8 +117,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                   bookmark_type=None,
                   data_key=None,
                   id_fields=None,
-                  parent=None,
-                  parent_id=None):
+                  days_interval=None):
 
 
     # Get the latest bookmark for the stream and set the last_integer/datetime
@@ -143,7 +136,9 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
     # windowing: loop through date days_interval date windows from last_datetime to now_datetime
     now_datetime = utils.now()
     if bookmark_query_field_from and bookmark_query_field_to:
-        days_interval = 60
+        # days_interval from config date_window_size, default = 60; passed to function from sync
+        if not days_interval:
+            days_interval = 60
         start_window = strptime_to_utc(last_datetime)
         end_window = start_window + timedelta(days=days_interval)
         if end_window > now_datetime:
@@ -179,7 +174,8 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         limit = 100 # Default limit for SaaSOptics API, unable to change this in v1.0
         total_records = 0
         while next_url is not None:
-            # Squash params to query-string params
+            # Need URL querystring for 1st page; subsequent pages provided by next_url
+            # querystring: Squash query params into string
             if page == 1 and not params == {}:
                 querystring = '&'.join(['%s=%s' % (key, value) for (key, value) in params.items()])
             else:
@@ -218,6 +214,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 LOGGER.info('No transformed data for data = {}'.format(data)) 
                 total_records = 0
                 break # No data results
+            for record in transformed_data:
+                for key in id_fields:
+                    if not record.get(key):
+                        LOGGER.info('xxx Missing key {} in record: {}'.format(key, record))
 
             # Process records and get the max_bookmark_value and record_count for the set of records
             max_bookmark_value, record_count = process_records(
@@ -229,67 +229,13 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 bookmark_type=bookmark_type,
                 max_bookmark_value=max_bookmark_value,
                 last_datetime=last_datetime,
-                last_integer=last_integer,
-                parent=parent,
-                parent_id=parent_id)
+                last_integer=last_integer)
             LOGGER.info('Stream {}, batch processed {} records'.format(
                 stream_name, record_count))
 
             # set total_records and next_url for pagination
             total_records = data.get('count', 0)
             next_url = data.get('next', None)
-
-            # Loop thru parent batch records for each children objects (if should stream)
-            children = endpoint_config.get('children')
-            if children:
-                for child_stream_name, child_endpoint_config in children.items():
-                    should_stream, last_stream_child = should_sync_stream(
-                        get_selected_streams(catalog),
-                        None,
-                        child_stream_name)
-                    if should_stream:
-                        # For each parent record
-                        for record in transformed_data:
-                            i = 0
-                            # Set parent_id
-                            for id_field in id_fields:
-                                if i == 0:
-                                    parent_id_field = id_field
-                                if id_field == 'id':
-                                    parent_id_field = id_field
-                                i = i + 1
-                            parent_id = record.get(parent_id_field)
-
-                            # sync_endpoint for child
-                            LOGGER.info(
-                                'START Sync for Stream: {}, parent_stream: {}, parent_id: {}'\
-                                    .format(child_stream_name, stream_name, parent_id))
-                            child_path = child_endpoint_config.get(
-                                'path', child_stream_name).format(str(parent_id))
-                            child_bookmark_field = next(iter(child_endpoint_config.get(
-                                'replication_keys', [])), None)
-                            child_total_records = sync_endpoint(
-                                client=client,
-                                catalog=catalog,
-                                state=state,
-                                start_date=start_date,
-                                stream_name=child_stream_name,
-                                path=child_path,
-                                endpoint_config=child_endpoint_config,
-                                static_params=child_endpoint_config.get('params', {}),
-                                bookmark_query_field_from=child_endpoint_config.get(
-                                    'bookmark_query_field_from'),
-                                bookmark_query_field_to=child_endpoint_config.get(
-                                    'bookmark_query_field_to'),
-                                bookmark_field=child_bookmark_field,
-                                bookmark_type=child_endpoint_config.get('bookmark_type'),
-                                data_key=child_endpoint_config.get('data_key', 'results'),
-                                id_fields=child_endpoint_config.get('key_properties'),
-                                parent=child_endpoint_config.get('parent'),
-                                parent_id=parent_id)
-                            LOGGER.info(
-                                'FINISHED Sync for Stream: {}, parent_id: {}, total_records: {}'\
-                                    .format(child_stream_name, parent_id, child_total_records))
 
             # Update the state with the max_bookmark_value for the stream
             if bookmark_field:
@@ -323,17 +269,6 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
     return endpoint_total
 
 
-# Review catalog and make a list of selected streams
-def get_selected_streams(catalog):
-    selected_streams = set()
-    for stream in catalog.streams:
-        mdata = metadata.to_map(stream.metadata)
-        root_metadata = mdata.get(())
-        if root_metadata and root_metadata.get('selected') is True:
-            selected_streams.add(stream.tap_stream_id)
-    return list(selected_streams)
-
-
 # Currently syncing sets the stream currently being delivered in the state.
 # If the integration is interrupted, this state property is used to identify
 #  the starting point to continue from.
@@ -346,62 +281,47 @@ def update_currently_syncing(state, stream_name):
     singer.write_state(state)
 
 
-# Review last_stream (last currently syncing stream), if any,
-#  and continue where it left off in the selected streams.
-# Or begin from the beginning, if no last_stream, and sync
-#  all selected steams.
-# Returns should_sync_stream (true/false) and last_stream.
-def should_sync_stream(selected_streams, last_stream, stream_name):
-    if last_stream == stream_name or last_stream is None:
-        if last_stream is not None:
-            last_stream = None
-        if stream_name in selected_streams:
-            return True, last_stream
-    return False, last_stream
-
-
 def sync(client, config, catalog, state):
     if 'start_date' in config:
         start_date = config['start_date']
 
-    selected_streams = get_selected_streams(catalog)
+    # Get selected_streams from catalog, based on state last_stream
+    #   last_stream = Previous currently synced stream, if the load was interrupted
+    last_stream = singer.get_currently_syncing(state)
+    LOGGER.info('last/currently syncing stream: {}'.format(last_stream))
+    selected_streams = []
+    for stream in catalog.get_selected_streams(state):
+        selected_streams.append(stream.stream)
     LOGGER.info('selected_streams: {}'.format(selected_streams))
 
     if not selected_streams:
         return
 
-    # last_stream = Previous currently synced stream, if the load was interrupted
-    last_stream = singer.get_currently_syncing(state)
-    LOGGER.info('last/currently syncing stream: {}'.format(last_stream))
+    # Loop through selected_streams
+    for stream_name in selected_streams:
+        LOGGER.info('START Syncing: {}'.format(stream_name))
+        update_currently_syncing(state, stream_name)
+        endpoint_config = STREAMS[stream_name]
+        path = endpoint_config.get('path', stream_name)
+        bookmark_field = next(iter(endpoint_config.get('replication_keys', [])), None)
+        total_records = sync_endpoint(
+            client=client,
+            catalog=catalog,
+            state=state,
+            start_date=start_date,
+            stream_name=stream_name,
+            path=path,
+            endpoint_config=endpoint_config,
+            static_params=endpoint_config.get('params', {}),
+            bookmark_query_field_from=endpoint_config.get('bookmark_query_field_from'),
+            bookmark_query_field_to=endpoint_config.get('bookmark_query_field_to'),
+            bookmark_field=bookmark_field,
+            bookmark_type=endpoint_config.get('bookmark_type'),
+            data_key=endpoint_config.get('data_key', 'results'),
+            id_fields=endpoint_config.get('key_properties'),
+            days_interval=config.get('date_window_size', 60))
 
-    # For each endpoint STREAM (in streams.py), determine if the stream should be streamed
-    #   (based on the catalog and last_stream), then sync those streams.
-    for stream_name, endpoint_config in STREAMS.items():
-        should_stream, last_stream = should_sync_stream(selected_streams,
-                                                        last_stream,
-                                                        stream_name)
-        if should_stream:
-            LOGGER.info('START Syncing: {}'.format(stream_name))
-            update_currently_syncing(state, stream_name)
-            path = endpoint_config.get('path', stream_name)
-            bookmark_field = next(iter(endpoint_config.get('replication_keys', [])), None)
-            total_records = sync_endpoint(
-                client=client,
-                catalog=catalog,
-                state=state,
-                start_date=start_date,
-                stream_name=stream_name,
-                path=path,
-                endpoint_config=endpoint_config,
-                static_params=endpoint_config.get('params', {}),
-                bookmark_query_field_from=endpoint_config.get('bookmark_query_field_from'),
-                bookmark_query_field_to=endpoint_config.get('bookmark_query_field_to'),
-                bookmark_field=bookmark_field,
-                bookmark_type=endpoint_config.get('bookmark_type'),
-                data_key=endpoint_config.get('data_key', 'results'),
-                id_fields=endpoint_config.get('key_properties'))
-
-            update_currently_syncing(state, None)
-            LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(
-                stream_name,
-                total_records))
+        update_currently_syncing(state, None)
+        LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(
+            stream_name,
+            total_records))

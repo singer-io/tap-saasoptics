@@ -33,7 +33,7 @@ This tap:
 [customers](https://saasoptics.zendesk.com/hc/en-us/articles/115013751587-Customers-CRUD-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/customers/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: currency, payment_terms, parent
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: modified__gte, modified__lte
   - Bookmark: modified (date-time)
@@ -42,7 +42,7 @@ This tap:
 [contracts](https://saasoptics.zendesk.com/hc/en-us/articles/115013751607-Contracts-CRUD-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/contracts/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: parent_id, payment_terms, customer, register
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: modified__gte, modified__lte
   - Bookmark: modified (date-time)
@@ -51,7 +51,7 @@ This tap:
 [invoices](https://saasoptics.zendesk.com/hc/en-us/articles/115013918148-Invoices-CRUD-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/invoices/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: contract, item, transaction, 
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: auditentry__modified__gte, auditentry__modified__lte
   - Bookmark: modified (date-time)
@@ -60,7 +60,7 @@ This tap:
 [items](https://saasoptics.zendesk.com/hc/en-us/articles/115013751567-Items-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/items/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: asset_account, billing_method, income_account, liability_account, revenue_recognition_method, 
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: modified__gte, modified__lte
   - Bookmark: modified (date-time)
@@ -69,7 +69,7 @@ This tap:
 [transactions](https://saasoptics.zendesk.com/hc/en-us/articles/360000066333-Transactions-CRUD-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/transactions/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: autorenewal_profile, billing_method, contract, item, renew_using_item, 
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: auditentry__modified__gte, auditentry__modified__lte
   - Bookmark: modified (date-time)
@@ -78,56 +78,56 @@ This tap:
 [billing_descriptions](https://saasoptics.zendesk.com/hc/en-us/articles/115013751807-Billing-Line-Item-Descriptions-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/billing_descriptions/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [accounts](https://saasoptics.zendesk.com/hc/en-us/articles/115013751507-Accounts-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/accounts/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [auto_renewal_profiles](https://saasoptics.zendesk.com/hc/en-us/articles/115013918268-Auto-Renewal-Profiles-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/auto_renewal_profiles/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
   
 [billing_methods](https://saasoptics.zendesk.com/hc/en-us/articles/115003604433-Billing-Methods-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/billing_methods/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [country_codes](https://saasoptics.zendesk.com/hc/en-us/articles/115003604453-Country-Codes-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/country_codes/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [currency_codes](https://saasoptics.zendesk.com/hc/en-us/articles/115003604473-Currency-Codes-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/currency_codes/
 - Primary key fields: code
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [payment_terms](https://saasoptics.zendesk.com/hc/en-us/articles/115003642673-Payment-Terms-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/payment_terms/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [registers](https://saasoptics.zendesk.com/hc/en-us/articles/115013751707-Registers-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/registers/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: modified__gte, modified__lte
   - Bookmark: modified (date-time)
@@ -136,7 +136,7 @@ This tap:
 [revenue_entries](https://saasoptics.zendesk.com/hc/en-us/articles/115003674273-Revenue-Entries-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/revenue_entries/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: transaction
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark query fields: modified__gte, modified__lte
   - Bookmark: modified (date-time)
@@ -145,14 +145,14 @@ This tap:
 [revenue_recognition_methods](https://saasoptics.zendesk.com/hc/en-us/articles/115003617774-Revenue-Recognition-Methods-R-)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/revenue_recognition_methods/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: FULL_TABLE
 - Transformations: none
 
 [sales_orders](https://saasoptics.zendesk.com/hc/en-us/articles/360000738813-Sales-Orders-CR-) and [sales_order_line_items](https://saasoptics.zendesk.com/hc/en-us/articles/360000751354)
 - Endpoint: https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/sales_orders/
 - Primary key fields: id
-- Foreign key fields: 
+- Foreign key fields: none
 - Replication strategy: INCREMENTAL (query all, filter results)
   - Bookmark: created (date-time)
   - RECOMMENDATION: Include in initial load, then deactivate this endpoint. This table/endpoint contains historical sales orders only. It may contain A LOT of records that never/rarely change.
@@ -184,7 +184,7 @@ This tap:
     - [singer-tools](https://github.com/singer-io/singer-tools)
     - [target-stitch](https://github.com/singer-io/target-stitch)
 
-3. Create your tap's `config.json` file. The `server_subdomain` is everything before `.saasoptics.com.` in the SaaSOptics URL.  The `account_name` is everything between `.saasoptics.com.` and `api` in the SaaSOptics URL.
+3. Create your tap's `config.json` file. The `server_subdomain` is everything before `.saasoptics.com.` in the SaaSOptics URL.  The `account_name` is everything between `.saasoptics.com.` and `api` in the SaaSOptics URL. The `date_window_size` is the integer number of days (between the from and to dates) for date-windowing through the date-filtered endpoints (default = 60).
 
     ```json
     {
@@ -192,7 +192,8 @@ This tap:
         "account_name": "YOUR_ACCOUNT_NAME",
         "server_subdomain": "YOUR_SERVER_SUBDOMAIN",
         "start_date": "2019-01-01T00:00:00Z",
-        "user_agent": "tap-saasoptics <api_user_email@your_company.com>"
+        "user_agent": "tap-saasoptics <api_user_email@your_company.com>",
+        "date_window_size": 60
     }
     ```
     
