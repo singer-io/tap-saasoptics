@@ -11,14 +11,14 @@
       "format": "date-time"
     },
     "auditentry_created_by_name": {
-      "type": "string"
+      "type": ["null", "string"]
     },
     "auditentry_modified": {
       "type": ["null", "string"],
       "format": "date-time"
     },
     "auditentry_modified_by_name": {
-      "type": "string"
+      "type": ["null", "string"]
     },
     "auditentry_qb_created": {
       "type": ["null", "string"],
