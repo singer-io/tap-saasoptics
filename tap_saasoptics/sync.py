@@ -319,7 +319,7 @@ def sync(client, config, catalog, state):
             bookmark_type=endpoint_config.get('bookmark_type'),
             data_key=endpoint_config.get('data_key', 'results'),
             id_fields=endpoint_config.get('key_properties'),
-            days_interval=config.get('date_window_size', 60))
+            days_interval=int(config.get('date_window_size', '60')))
 
         update_currently_syncing(state, None)
         LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(

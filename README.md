@@ -193,7 +193,7 @@ This tap:
         "server_subdomain": "YOUR_SERVER_SUBDOMAIN",
         "start_date": "2019-01-01T00:00:00Z",
         "user_agent": "tap-saasoptics <api_user_email@your_company.com>",
-        "date_window_size": 60
+        "date_window_size": "60"
     }
     ```
     
