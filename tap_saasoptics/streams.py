@@ -130,6 +130,4 @@ STREAMS = {
         'bookmark_type': 'datetime',
         'stream_alias': 'deleted'
     }
-
-
 }

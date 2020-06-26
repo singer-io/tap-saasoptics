@@ -75,7 +75,7 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     stream_metadata)
 
                 if stream_alias == 'deleted':
-                    transformed_record['type'] = stream_name.lstrip('deleted_')
+                    transformed_record['type'] = stream_name.replace('deleted_', '')
 
                 # Reset max_bookmark_value to new value if higher
                 if transformed_record.get(bookmark_field):
