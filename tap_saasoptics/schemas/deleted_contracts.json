@@ -11,9 +11,6 @@
     },
     "deleted_by": {
       "type": ["null", "string"]
-    },
-    "type": {
-      "type": ["null", "string"]
     }
   }
 }

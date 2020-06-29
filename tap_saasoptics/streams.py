@@ -108,26 +108,23 @@ STREAMS = {
     },
     'deleted_contracts': {
         'path': 'contracts/deleted',
-        'key_properties': ['type', 'id'],
+        'key_properties': ['id'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['deleted'],
-        'bookmark_type': 'datetime',
-        'stream_alias': 'deleted'
+        'bookmark_type': 'datetime'
     },
     'deleted_transactions': {
         'path': 'transactions/deleted',
-        'key_properties': ['type', 'id'],
+        'key_properties': ['id'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['deleted'],
-        'bookmark_type': 'datetime',
-        'stream_alias': 'deleted'
+        'bookmark_type': 'datetime'
     },
     'deleted_invoices': {
         'path': 'invoices/deleted',
-        'key_properties': ['type', 'id'],
+        'key_properties': ['id'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['deleted'],
-        'bookmark_type': 'datetime',
-        'stream_alias': 'deleted'
+        'bookmark_type': 'datetime'
     }
 }

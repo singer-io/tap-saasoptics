@@ -59,9 +59,8 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     bookmark_type=None,
                     max_bookmark_value=None,
                     last_datetime=None,
-                    last_integer=None,
-                    stream_alias=None):
-    stream = catalog.get_stream(stream_alias or stream_name)
+                    last_integer=None):
+    stream = catalog.get_stream(stream_name)
     schema = stream.schema.to_dict()
     stream_metadata = metadata.to_map(stream.metadata)
 
@@ -74,9 +73,6 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     schema,
                     stream_metadata)
 
-                if stream_alias == 'deleted':
-                    transformed_record['type'] = stream_name.replace('deleted_', '')
-
                 # Reset max_bookmark_value to new value if higher
                 if transformed_record.get(bookmark_field):
                     if max_bookmark_value is None or \
@@ -87,7 +83,7 @@ def process_records(catalog, #pylint: disable=too-many-branches
                     if bookmark_type == 'integer':
                         # Keep only records whose bookmark is after the last_integer
                         if transformed_record[bookmark_field] >= last_integer:
-                            write_record(stream_alias or stream_name, transformed_record, \
+                            write_record(stream_name, transformed_record, \
                                 time_extracted=time_extracted)
                             counter.increment()
                     elif bookmark_type == 'datetime':
@@ -95,11 +91,11 @@ def process_records(catalog, #pylint: disable=too-many-branches
                         bookmark_dttm = transform_datetime(transformed_record[bookmark_field])
                         # Keep only records whose bookmark is after the last_datetime
                         if bookmark_dttm >= last_dttm:
-                            write_record(stream_alias or stream_name, transformed_record, \
+                            write_record(stream_name, transformed_record, \
                                 time_extracted=time_extracted)
                             counter.increment()
                 else:
-                    write_record(stream_alias or stream_name, transformed_record, time_extracted=time_extracted)
+                    write_record(stream_name, transformed_record, time_extracted=time_extracted)
                     counter.increment()
 
         return max_bookmark_value, counter.value
@@ -120,8 +116,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                   bookmark_type=None,
                   data_key=None,
                   id_fields=None,
-                  days_interval=None,
-                  stream_alias=None):
+                  days_interval=None):
 
 
     # Get the latest bookmark for the stream and set the last_integer/datetime
@@ -135,7 +130,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         last_datetime = get_bookmark(state, stream_name, start_date)
         max_bookmark_value = last_datetime
 
-    write_schema(catalog, stream_alias or stream_name)
+    write_schema(catalog, stream_name)
 
     # windowing: loop through date days_interval date windows from last_datetime to now_datetime
     now_datetime = utils.now()
@@ -229,8 +224,7 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 bookmark_type=bookmark_type,
                 max_bookmark_value=max_bookmark_value,
                 last_datetime=last_datetime,
-                last_integer=last_integer,
-                stream_alias=stream_alias)
+                last_integer=last_integer)
             LOGGER.info('Stream {}, batch processed {} records'.format(
                 stream_name, record_count))
 
@@ -282,12 +276,6 @@ def update_currently_syncing(state, stream_name):
     singer.write_state(state)
 
 
-def stream_is_selected(stream_name, selected_streams):
-    if stream_name.startswith('deleted') and 'deleted' in selected_streams:
-        return True
-    else:
-        return stream_name in selected_streams
-
 def sync(client, config, catalog, state):
     if 'start_date' in config:
         start_date = config['start_date']
@@ -305,10 +293,7 @@ def sync(client, config, catalog, state):
         return
 
     # Loop through selected_streams
-    for stream_name, endpoint_config in STREAMS.items():
-        if not stream_is_selected(stream_name, selected_streams):
-            continue
-
+    for stream_name in selected_streams:
         LOGGER.info('START Syncing: {}'.format(stream_name))
         update_currently_syncing(state, stream_name)
         endpoint_config = STREAMS[stream_name]
@@ -329,8 +314,7 @@ def sync(client, config, catalog, state):
             bookmark_type=endpoint_config.get('bookmark_type'),
             data_key=endpoint_config.get('data_key', 'results'),
             id_fields=endpoint_config.get('key_properties'),
-            days_interval=int(config.get('date_window_size', '60')),
-            stream_alias=endpoint_config.get('stream_alias'))
+            days_interval=int(config.get('date_window_size', '60')))
 
         update_currently_syncing(state, None)
         LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(

@@ -14,10 +14,6 @@ def get_schemas():
     field_metadata = {}
 
     for stream_name, stream_metadata in STREAMS.items():
-        stream_name = stream_metadata.get('stream_alias', stream_name)
-        if stream_name in schemas:
-            continue
-
         schema_path = get_abs_path('schemas/{}.json'.format(stream_name))
         with open(schema_path) as file:
             schema = json.load(file)
