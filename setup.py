@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 setup(name='tap-saasoptics',
-      version='1.0.0',
+      version='1.1.0',
       description='Singer.io tap for extracting data from the SaaSOptics v1.0 API',
       author='jeff.huth@bytecode.io',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
