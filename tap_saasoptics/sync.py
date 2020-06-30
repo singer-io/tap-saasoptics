@@ -24,7 +24,6 @@ def write_record(stream_name, record, time_extracted):
         singer.messages.write_record(stream_name, record, time_extracted=time_extracted)
     except OSError as err:
         LOGGER.info('OS Error writing record for: {}'.format(stream_name))
-        LOGGER.info('record: {}'.format(record))
         raise err
 
 
@@ -211,13 +210,9 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 transformed_data = transform_json(data, stream_name, data_key)
             # LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
             if not transformed_data or transformed_data is None:
-                LOGGER.info('No transformed data for data = {}'.format(data)) 
+                LOGGER.info('No transformed data for data = {}'.format(data))
                 total_records = 0
                 break # No data results
-            for record in transformed_data:
-                for key in id_fields:
-                    if not record.get(key):
-                        LOGGER.info('xxx Missing key {} in record: {}'.format(key, record))
 
             # Process records and get the max_bookmark_value and record_count for the set of records
             max_bookmark_value, record_count = process_records(
