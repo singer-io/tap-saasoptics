@@ -3,15 +3,15 @@
 from setuptools import setup, find_packages
 
 setup(name='tap-saasoptics',
-      version='1.1.0',
+      version='1.1.1',
       description='Singer.io tap for extracting data from the SaaSOptics v1.0 API',
       author='jeff.huth@bytecode.io',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_saasoptics'],
       install_requires=[
           'backoff==1.8.0',
-          'requests==2.22.0',
-          'singer-python==5.8.1'
+          'requests==2.23.0',
+          'singer-python==5.9.0'
       ],
       entry_points='''
           [console_scripts]
