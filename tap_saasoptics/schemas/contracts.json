@@ -79,16 +79,37 @@
           "type": ["null", "string"]
         },
         "job_end_date": {
-          "type": ["null", "string"],
-          "format": "date-time"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
         },
         "job_projected_end_date": {
-          "type": ["null", "string"],
-          "format": "date-time"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
         },
         "job_start_date": {
-          "type": ["null", "string"],
-          "format": "date-time"
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "format": "date-time"
+            }
+          ]
         },
         "job_status": {
           "type": ["null", "string"]
@@ -159,8 +180,15 @@
       "type": ["null", "string"]
     },
     "entry_date": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "format": "date-time"
+        }
+      ]
     },
     "id": {
       "type": ["null", "integer"]
@@ -169,15 +197,29 @@
       "type": ["null", "boolean"]
     },
     "lead_date": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "format": "date-time"
+        }
+      ]
     },
     "lead_source": {
       "type": ["null", "string"]
     },
     "modified": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "format": "date-time"
+        }
+      ]
     },
     "notes": {
       "type": ["null", "string"]

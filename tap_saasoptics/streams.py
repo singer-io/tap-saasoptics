@@ -126,5 +126,12 @@ STREAMS = {
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['deleted'],
         'bookmark_type': 'datetime'
+    },
+    'deleted_revenue_entries': {
+        'path': 'revenue_entries/deleted',
+        'key_properties': ['id'],
+        'replication_method': 'INCREMENTAL',
+        'replication_keys': ['deleted'],
+        'bookmark_type': 'datetime'
     }
 }
