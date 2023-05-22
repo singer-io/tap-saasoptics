@@ -10,7 +10,7 @@ setup(name='tap-saasoptics',
       py_modules=['tap_saasoptics'],
       install_requires=[
           'backoff==1.8.0',
-          'requests==2.23.0',
+          'requests==2.31.0',
           'singer-python==5.9.0'
       ],
       entry_points='''
