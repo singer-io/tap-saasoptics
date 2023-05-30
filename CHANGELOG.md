@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+  * Dependabot update [#7](https://github.com/singer-io/tap-saasoptics/pull/7)
+
 ## 1.1.1
   * Add `deleted_revenue_entries` stream. Fix `singer-check-tap` issues with `contracts` date-time fields.
 
