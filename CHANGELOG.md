@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0
+  * Library updates: `backoff`, `requests` and `singer-python`
+
 ## 1.1.1
   * Add `deleted_revenue_entries` stream. Fix `singer-check-tap` issues with `contracts` date-time fields.
 
