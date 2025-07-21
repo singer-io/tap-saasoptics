@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+  * Bump depenedencies [#10](https://github.com/singer-io/tap-saasoptics/pull/10)
+
 ## 1.1.1
   * Add `deleted_revenue_entries` stream. Fix `singer-check-tap` issues with `contracts` date-time fields.
 
