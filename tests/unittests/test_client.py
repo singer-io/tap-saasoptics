@@ -6,6 +6,7 @@ import requests
 from tap_saasoptics.client import (
     SaaSOpticsClient,
     SaaSOpticsBadRequestError,
+    SaaSOpticsConflictError,
     SaaSOpticsUnauthorizedError,
     SaaSOpticsForbiddenError,
     SaaSOpticsNotFoundError,
@@ -31,6 +32,9 @@ class TestGetExceptionForErrorCode(unittest.TestCase):
 
     def test_404_maps_to_not_found(self):
         self.assertIs(get_exception_for_error_code(404), SaaSOpticsNotFoundError)
+    
+    def test_409_maps_to_conflict(self):
+        self.assertIs(get_exception_for_error_code(409), SaaSOpticsConflictError)
 
     def test_500_maps_to_internal_service_error(self):
         self.assertIs(

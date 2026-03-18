@@ -54,7 +54,7 @@ ERROR_CODE_EXCEPTION_MAPPING = {
     402: SaaSOpticsPaymentRequiredError,
     403: SaaSOpticsForbiddenError,
     404: SaaSOpticsNotFoundError,
-    409: SaaSOpticsForbiddenError,
+    409: SaaSOpticsConflictError,
     500: SaaSOpticsInternalServiceError}
 
 
