@@ -9,9 +9,9 @@ setup(name='tap-saasoptics',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_saasoptics'],
       install_requires=[
-          'backoff==1.10.0',
+          'backoff==2.2.1',
           'requests==2.32.4',
-          'singer-python==5.13.2'
+          'singer-python==6.8.0'
       ],
       entry_points='''
           [console_scripts]
@@ -19,8 +19,8 @@ setup(name='tap-saasoptics',
       ''',
       extras_require={
           'dev': [
-              'pylint==4.0.5',
-              'pytest==9.0.2'
+              'pylint',
+              'pytest'
           ]
       },
       packages=find_packages(),
