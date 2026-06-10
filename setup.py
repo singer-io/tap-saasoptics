@@ -17,6 +17,12 @@ setup(name='tap-saasoptics',
           [console_scripts]
           tap-saasoptics=tap_saasoptics:main
       ''',
+      extras_require={
+          'dev': [
+              'pylint==4.0.5',
+              'pytest==9.0.2'
+          ]
+      },
       packages=find_packages(),
       package_data={
           'tap_saasoptics': [

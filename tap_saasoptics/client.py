@@ -54,7 +54,7 @@ ERROR_CODE_EXCEPTION_MAPPING = {
     402: SaaSOpticsPaymentRequiredError,
     403: SaaSOpticsForbiddenError,
     404: SaaSOpticsNotFoundError,
-    409: SaaSOpticsForbiddenError,
+    409: SaaSOpticsConflictError,
     500: SaaSOpticsInternalServiceError}
 
 
@@ -71,13 +71,14 @@ def raise_for_error(response):
                 # There is nothing we can do here since SaaSOptics has neither sent
                 # us a 2xx response nor a response content.
                 return
+            status_code = response.status_code
             response = response.json()
             if ('error' in response) or ('errorCode' in response):
                 message = '%s: %s' % (response.get('error', str(error)),
                                       response.get('message', 'Unknown Error'))
                 error_code = response.get('error', {}).get('code')
                 ex = get_exception_for_error_code(error_code)
-                if response.status_code == 401 and 'Expired token' in message:
+                if status_code == 401 and 'Expired token' in message:
                     LOGGER.error("Your API token has expired as per SaaSOptics’s security \
                         policy. \n Please re-authenticate your connection to generate a new token \
                         and resume extraction.")

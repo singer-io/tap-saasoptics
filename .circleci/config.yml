@@ -18,6 +18,16 @@ jobs:
           command: |
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
             stitch-validate-json /usr/local/share/virtualenvs/tap-saasoptics/lib/python3.12/site-packages/tap_saasoptics/schemas/*.json
+      - run:
+          name: 'Unit Tests'
+          command: |
+            source /usr/local/share/virtualenvs/tap-saasoptics/bin/activate
+            python -m pytest tests/unittests
+      - run:
+          name: 'Integration Tests'
+          command: |
+            source /usr/local/share/virtualenvs/tap-saasoptics/bin/activate
+            python -m pytest tests --ignore=tests/unittests
 workflows:
   version: 2
   commit:
