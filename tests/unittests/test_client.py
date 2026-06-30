@@ -141,6 +141,21 @@ class TestSaaSOpticsClientCheckToken(unittest.TestCase):
         with self.assertRaises(Exception):
             client.check_token()
 
+    @patch("tap_saasoptics.client.requests.Session")
+    def test_check_token_raises_clear_error_on_connection_failure(self, mock_session_cls):
+        """check_token() should raise a clear SaaSOpticsError on TLS/connection failures."""
+        mock_session = MagicMock()
+        mock_session.get.side_effect = requests.exceptions.SSLError("handshake failure")
+        mock_session_cls.return_value = mock_session
+
+        client = self._make_client()
+        client._SaaSOpticsClient__session = mock_session
+
+        with self.assertRaises(SaaSOpticsError) as caught:
+            client.check_token()
+
+        self.assertIn('Failed to validate SaaSOptics credentials and API endpoint', str(caught.exception))
+
 
 class TestSaaSOpticsClientRequest(unittest.TestCase):
     """Unit tests for SaaSOpticsClient.request()."""
