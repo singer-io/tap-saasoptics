@@ -9,7 +9,7 @@ LOGGER = singer.get_logger()
 
 def _check_stream_access(client, stream_name, stream_config):
     path = stream_config.get('path', stream_name)
-    client.get(path=path)
+    client.get(path, endpoint=f'discover:{stream_name}')
 
 
 def _apply_access_checks(client, streams):
