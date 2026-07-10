@@ -27,7 +27,10 @@ def _apply_access_checks(client, streams):
             inaccessible.append(stream_name)
 
     if inaccessible:
-        LOGGER.warning('Skipping inaccessible streams: %s', ', '.join(inaccessible))
+        LOGGER.warning(
+            'Unauthorized streams excluded from catalog: %s',
+            ', '.join(inaccessible)
+        )
 
     if not accessible:
         raise SaaSOpticsForbiddenError(
