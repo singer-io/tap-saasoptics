@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.3.0
-  * Exclude inaccessible streams during discovery and fail discovery when no streams are accessible. [#16] (http://github.com/singer-io/tap-saasoptics/pull/16)
+  * Exclude inaccessible streams during discovery and fail discovery when no streams are accessible. [#16](https://github.com/singer-io/tap-saasoptics/pull/16)
 
 ## 1.2.0
   * Upgrade python version to 3.12 [#12](https://github.com/singer-io/tap-saasoptics/pull/12)
