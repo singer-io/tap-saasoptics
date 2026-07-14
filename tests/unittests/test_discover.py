@@ -1,7 +1,11 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from tap_saasoptics.discover import discover
+from tap_saasoptics.discover import (
+    discover,
+    _check_stream_access,
+    _apply_access_checks,
+)
 from tap_saasoptics.client import SaaSOpticsForbiddenError
 from tap_saasoptics.streams import STREAMS
 
@@ -47,3 +51,69 @@ class TestDiscover(unittest.TestCase):
         for entry in catalog.streams:
             with self.subTest(stream=entry.tap_stream_id):
                 self.assertEqual(entry.stream, entry.tap_stream_id)
+
+
+class TestAccessChecks(unittest.TestCase):
+    """Unit tests for discovery access-check helpers."""
+
+    def test_check_stream_access_returns_false_and_logs_on_forbidden(self):
+        """_check_stream_access() should return False and log warning on 403."""
+        client = MagicMock()
+        client.get.side_effect = SaaSOpticsForbiddenError('Forbidden')
+
+        with patch('tap_saasoptics.discover.LOGGER') as mock_logger:
+            result = _check_stream_access(client, 'customers', {'path': 'customers'})
+
+        self.assertFalse(result)
+        mock_logger.warning.assert_called_once_with(
+            "No 'read' access to stream '%s'. Excluded from catalog.",
+            'customers',
+        )
+
+    def test_apply_access_checks_includes_pruned_children_in_consolidated_warning(self):
+        """Consolidated warning should include inaccessible parents and pruned child streams."""
+        client = MagicMock()
+        schemas = {'parent_stream': {}, 'child_stream': {}, 'other_stream': {}}
+        field_metadata = {'parent_stream': [], 'child_stream': [], 'other_stream': []}
+
+        test_streams = {
+            'parent_stream': {'path': 'parent_stream'},
+            'child_stream': {'path': 'child_stream', 'parent': 'parent_stream'},
+            'other_stream': {'path': 'other_stream'},
+        }
+
+        with patch('tap_saasoptics.discover.STREAMS', test_streams), \
+             patch('tap_saasoptics.discover._check_stream_access') as mock_check, \
+             patch('tap_saasoptics.discover.LOGGER') as mock_logger:
+            mock_check.side_effect = lambda _client, stream_name, _cfg: stream_name != 'parent_stream'
+
+            _apply_access_checks(client, schemas, field_metadata)
+
+        self.assertNotIn('parent_stream', schemas)
+        self.assertNotIn('child_stream', schemas)
+        self.assertIn('other_stream', schemas)
+
+        warning_calls = [str(call) for call in mock_logger.warning.call_args_list]
+        self.assertTrue(any("No 'read' access to stream(s):" in call for call in warning_calls))
+        self.assertTrue(any('parent_stream, child_stream' in call for call in warning_calls))
+
+    def test_apply_access_checks_raises_with_expected_message_when_no_stream_access(self):
+        """No accessible streams should raise exact 403 error message."""
+        client = MagicMock()
+        schemas = {'customers': {}, 'contracts': {}}
+        field_metadata = {'customers': [], 'contracts': []}
+
+        test_streams = {
+            'customers': {'path': 'customers'},
+            'contracts': {'path': 'contracts'},
+        }
+
+        with patch('tap_saasoptics.discover.STREAMS', test_streams), \
+             patch('tap_saasoptics.discover._check_stream_access', return_value=False):
+            with self.assertRaises(SaaSOpticsForbiddenError) as ctx:
+                _apply_access_checks(client, schemas, field_metadata)
+
+        self.assertEqual(
+            str(ctx.exception),
+            "HTTP-error-code: 403, Error: The credentials do not have 'read' access to any supported streams.",
+        )

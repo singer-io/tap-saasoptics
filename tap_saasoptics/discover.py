@@ -8,51 +8,82 @@ LOGGER = singer.get_logger()
 
 
 def _check_stream_access(client, stream_name, stream_config):
+    """Return True when stream is accessible, False on 403."""
     path = stream_config.get('path', stream_name)
-    client.get(path, endpoint=f'discover:{stream_name}')
-
-
-def _apply_access_checks(client, streams):
-    if client is None:
-        return streams
-
-    accessible = []
-    inaccessible = []
-
-    for stream_name, stream_config in streams:
-        try:
-            _check_stream_access(client, stream_name, stream_config)
-            accessible.append((stream_name, stream_config))
-        except SaaSOpticsForbiddenError as exc:
-            LOGGER.warning(
-                "Permission Error: Stream '%s' - %s",
-                stream_name,
-                exc,
-            )
-            inaccessible.append(stream_name)
-
-    if inaccessible:
+    try:
+        client.get(path, endpoint=f'discover:{stream_name}')
+        return True
+    except SaaSOpticsForbiddenError:
         LOGGER.warning(
-            'Unauthorized streams excluded from catalog: %s',
-            ', '.join(inaccessible)
+            "No 'read' access to stream '%s'. Excluded from catalog.",
+            stream_name,
         )
+        return False
 
-    if not accessible:
+
+def _prune_inaccessible_children(schemas: dict, field_metadata: dict) -> list:
+    """Remove child streams when their parent stream is inaccessible."""
+    inaccessible_children = []
+    for stream_name, stream_cfg in list(STREAMS.items()):
+        parent = stream_cfg.get('parent')
+        if stream_name in schemas and parent and parent not in schemas:
+            LOGGER.warning(
+                "Stream '%s' excluded from catalog because its parent stream '%s' is not accessible.",
+                stream_name,
+                parent,
+            )
+            schemas.pop(stream_name, None)
+            field_metadata.pop(stream_name, None)
+            inaccessible_children.append(stream_name)
+
+    return inaccessible_children
+
+
+def _apply_access_checks(client, schemas: dict, field_metadata: dict) -> None:
+    """Exclude streams the credentials cannot read (403) from discovery output."""
+    if client is None:
+        return
+
+    inaccessible_streams = [
+        stream_name
+        for stream_name, stream_cfg in STREAMS.items()
+        if stream_name in schemas
+        and not stream_cfg.get('parent')
+        and not _check_stream_access(client, stream_name, stream_cfg)
+    ]
+
+    for stream_name in inaccessible_streams:
+        schemas.pop(stream_name, None)
+        field_metadata.pop(stream_name, None)
+
+    inaccessible_children = _prune_inaccessible_children(schemas, field_metadata)
+    all_inaccessible = inaccessible_streams + [
+        stream_name
+        for stream_name in inaccessible_children
+        if stream_name not in inaccessible_streams
+    ]
+
+    if not schemas:
         raise SaaSOpticsForbiddenError(
-            'No streams are accessible. Verify API permissions for the configured token.'
+            "HTTP-error-code: 403, Error: The credentials do not have 'read' access to any supported streams."
         )
 
-    return accessible
+    if all_inaccessible:
+        LOGGER.warning(
+            "No 'read' access to stream(s): %s. Excluded from catalog.",
+            ', '.join(all_inaccessible),
+        )
 
 
 def discover(client=None):
     schemas, field_metadata = get_schemas()
+    _apply_access_checks(client, schemas, field_metadata)
     catalog = Catalog([])
 
-    stream_items = list(STREAMS.items())
-    for stream_name, stream_metadata in _apply_access_checks(client, stream_items):
-        schema = Schema.from_dict(schemas[stream_name])
+    for stream_name, schema_dict in schemas.items():
+        schema = Schema.from_dict(schema_dict)
         mdata = field_metadata[stream_name]
+        stream_metadata = STREAMS.get(stream_name, {})
 
         catalog.streams.append(CatalogEntry(
             stream=stream_name,
