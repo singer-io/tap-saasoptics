@@ -23,7 +23,12 @@ def _apply_access_checks(client, streams):
         try:
             _check_stream_access(client, stream_name, stream_config)
             accessible.append((stream_name, stream_config))
-        except SaaSOpticsForbiddenError:
+        except SaaSOpticsForbiddenError as exc:
+            LOGGER.warning(
+                "Permission Error: Stream '%s' - %s",
+                stream_name,
+                exc,
+            )
             inaccessible.append(stream_name)
 
     if inaccessible:
