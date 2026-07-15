@@ -128,11 +128,11 @@ class SaaSOpticsClient(object):
                 # Simple endpoint that returns 1 Account record (to check API/token access):
                 url='{}/{}/'.format(self.base_url, 'billing_descriptions'),
                 headers=headers)
-        except requests.RequestException:
+        except requests.RequestException as exc:
             raise SaaSOpticsError(
                 'Failed to validate SaaSOptics credentials and API endpoint. '
-                'Verify token, account_name, server_subdomain, and TLS/network configuration. '
-                )
+                'Verify token, account_name, server_subdomain, and TLS/network configuration.'
+            ) from exc
         if response.status_code != 200:
             LOGGER.error('Error status_code = {}'.format(response.status_code))
             raise_for_error(response)
