@@ -154,7 +154,10 @@ class TestSaaSOpticsClientCheckToken(unittest.TestCase):
         with self.assertRaises(SaaSOpticsError) as caught:
             client.check_token()
 
-        self.assertIn('Failed to validate SaaSOptics credentials and API endpoint', str(caught.exception))
+        self.assertIn(
+            'Invalid SaaSOptics credentials or API endpoint. Check token, account_name, server_subdomain, and network config.',
+            str(caught.exception),
+        )
 
 
 class TestSaaSOpticsClientRequest(unittest.TestCase):
