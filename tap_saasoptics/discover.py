@@ -84,7 +84,7 @@ def discover(client=None):
     for stream_name, schema_dict in schemas.items():
         schema = Schema.from_dict(schema_dict)
         mdata = field_metadata[stream_name]
-        stream_metadata = STREAMS.get(stream_name, {})
+        stream_metadata = STREAMS[stream_name]
 
         catalog.streams.append(CatalogEntry(
             stream=stream_name,
