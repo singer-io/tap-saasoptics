@@ -13,10 +13,11 @@ def _check_stream_access(client, stream_name, stream_config):
     try:
         client.get(path, endpoint=f'discover:{stream_name}')
         return True
-    except SaaSOpticsForbiddenError:
+    except SaaSOpticsForbiddenError as exc:
         LOGGER.warning(
-            "No 'read' access to stream '%s'. Excluded from catalog.",
+            "Excluding unauthorized stream '%s' from catalog. API error: %s",
             stream_name,
+            exc,
         )
         return False
 
@@ -70,7 +71,7 @@ def _apply_access_checks(client, schemas: dict, field_metadata: dict) -> None:
 
     if all_inaccessible:
         LOGGER.warning(
-            "No 'read' access to stream(s): %s. Excluded from catalog.",
+            "Excluding unauthorized stream(s) from catalog: %s.",
             ', '.join(all_inaccessible),
         )
 

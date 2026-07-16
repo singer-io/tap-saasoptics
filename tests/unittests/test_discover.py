@@ -66,8 +66,9 @@ class TestAccessChecks(unittest.TestCase):
 
         self.assertFalse(result)
         mock_logger.warning.assert_called_once_with(
-            "No 'read' access to stream '%s'. Excluded from catalog.",
+            "Excluding unauthorized stream '%s' from catalog. API error: %s",
             'customers',
+            client.get.side_effect,
         )
 
     def test_apply_access_checks_includes_pruned_children_in_consolidated_warning(self):
@@ -94,7 +95,7 @@ class TestAccessChecks(unittest.TestCase):
         self.assertIn('other_stream', schemas)
 
         warning_calls = [str(call) for call in mock_logger.warning.call_args_list]
-        self.assertTrue(any("No 'read' access to stream(s):" in call for call in warning_calls))
+        self.assertTrue(any("Excluding unauthorized stream(s) from catalog:" in call for call in warning_calls))
         self.assertTrue(any('parent_stream, child_stream' in call for call in warning_calls))
 
     def test_apply_access_checks_raises_with_expected_message_when_no_stream_access(self):

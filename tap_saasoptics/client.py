@@ -130,8 +130,7 @@ class SaaSOpticsClient(object):
                 headers=headers)
         except requests.RequestException:
             raise SaaSOpticsError(
-                'Failed to validate SaaSOptics credentials and API endpoint. '
-                'Verify token, account_name, server_subdomain, and TLS/network configuration. '
+                'Invalid SaaSOptics credentials or API endpoint. Check token, account_name, server_subdomain, and network config.'
                 )
         if response.status_code != 200:
             LOGGER.error('Error status_code = {}'.format(response.status_code))
