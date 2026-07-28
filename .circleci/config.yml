@@ -19,10 +19,24 @@ jobs:
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
             stitch-validate-json /usr/local/share/virtualenvs/tap-saasoptics/lib/python3.12/site-packages/tap_saasoptics/schemas/*.json
       - run:
-          name: 'Unit Tests'
+          name: 'Unit Tests & Coverage Run'
           command: |
             source /usr/local/share/virtualenvs/tap-saasoptics/bin/activate
-            python -m pytest tests/unittests
+            uv pip install pytest coverage
+            mkdir -p test_output
+            coverage run -m pytest tests --junitxml=test_output/report.xml
+      - run:
+          name: 'Coverage Report'
+          command: |
+            source /usr/local/share/virtualenvs/tap-saasoptics/bin/activate
+            coverage report -m | tee coverage.txt
+            coverage html
+      - store_test_results:
+          path: test_output/report.xml
+      - store_artifacts:
+          path: htmlcov
+      - store_artifacts:
+          path: coverage.txt
       - run:
           name: 'Integration Tests'
           command: |
