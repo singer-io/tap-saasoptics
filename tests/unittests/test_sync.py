@@ -459,3 +459,79 @@ class TestSyncAdditional(unittest.TestCase):
 
         self.assertEqual(total, 0)
         mock_process_records.assert_not_called()
+
+    @patch("tap_saasoptics.sync.write_record")
+    def test_process_records_integer_branch_writes_record(self, mock_write_record):
+        stream = MagicMock()
+        stream.schema.to_dict.return_value = {
+            "type": "object",
+            "properties": {"id": {"type": "integer"}, "seq": {"type": "integer"}},
+        }
+        stream.metadata = []
+        catalog = MagicMock()
+        catalog.get_stream.return_value = stream
+
+        _max_bookmark, count = process_records(
+            catalog=catalog,
+            stream_name="accounts",
+            records=[{"id": 1, "seq": 0}],
+            time_extracted=datetime.now(timezone.utc),
+            bookmark_field="seq",
+            bookmark_type="integer",
+            max_bookmark_value=None,
+            last_datetime=None,
+            last_integer=0,
+        )
+
+        self.assertEqual(count, 1)
+        mock_write_record.assert_called_once()
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(0, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": 1, "seq": 1}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.write_bookmark")
+    @patch("tap_saasoptics.sync.strptime_to_utc")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_sync_endpoint_integer_window_defaults_and_data_key_none(
+        self,
+        mock_now,
+        mock_strptime_to_utc,
+        _mock_write_bookmark,
+        _mock_write_schema,
+        _mock_transform_json,
+        _mock_process_records,
+    ):
+        start_window = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        now_dt = datetime(2025, 1, 1, 1, tzinfo=timezone.utc)
+        mock_strptime_to_utc.return_value = start_window
+        mock_now.return_value = now_dt
+
+        client = MagicMock()
+        client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = {
+            "count": 1,
+            "next": None,
+            "results": [{"id": 1, "seq": 1}],
+        }
+
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2024-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from="seq__gte",
+            bookmark_query_field_to="seq__lte",
+            bookmark_field="seq",
+            bookmark_type="integer",
+            data_key=None,
+            id_fields=["id"],
+            days_interval=None,
+        )
+
+        self.assertEqual(total, 1)
+        params_sent = client.get.call_args.kwargs["params"]
+        self.assertIn("seq__gte=0", params_sent)

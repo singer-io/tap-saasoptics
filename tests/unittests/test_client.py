@@ -17,6 +17,7 @@ from tap_saasoptics.client import (
     get_exception_for_error_code,
 )
 
+
 class TestGetExceptionForErrorCode(unittest.TestCase):
     """Unit tests for the error-code → exception-class mapping."""
 
@@ -74,6 +75,14 @@ class TestRaiseForError(unittest.TestCase):
             401,
             json_body={"error": {"code": 401}, "message": "Unauthorized"},
         )
+        with self.assertRaises(SaaSOpticsError):
+            raise_for_error(resp)
+
+    def test_raises_saasoptics_error_when_json_parse_fails(self):
+        """JSON parse errors should be wrapped in SaaSOpticsError."""
+        resp = self._make_response(500)
+        resp.json.side_effect = ValueError("bad json")
+
         with self.assertRaises(SaaSOpticsError):
             raise_for_error(resp)
 
@@ -221,6 +230,25 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client.get(path="billing_descriptions", url="https://example.com/api/v1.0/billing_descriptions/")
         call_args = mock_session.request.call_args
         self.assertEqual(call_args[0][0], "GET")
+
+    @patch("tap_saasoptics.client.metrics.http_request_timer")
+    def test_request_calls_check_token_when_unverified(self, mock_timer):
+        timer_cm = MagicMock()
+        timer_cm.__enter__.return_value = MagicMock(tags={})
+        timer_cm.__exit__.return_value = False
+        mock_timer.return_value = timer_cm
+
+        client = SaaSOpticsClient("test-token", "test-account", "test-subdomain")
+        client._SaaSOpticsClient__session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"results": []}
+        client._SaaSOpticsClient__session.request.return_value = response
+        client.check_token = MagicMock(return_value=True)
+
+        client.request("GET", url="https://example.com/api/v1.0/customers/")
+
+        client.check_token.assert_called_once_with()
 
 
 class TestClientAdditional(unittest.TestCase):

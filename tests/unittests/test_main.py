@@ -1,4 +1,5 @@
 import argparse
+import runpy
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -88,3 +89,35 @@ class TestMainModule(unittest.TestCase):
             catalog=parsed_args.catalog,
             state=parsed_args.state,
         )
+
+    @patch("tap_saasoptics.discover.discover")
+    @patch("tap_saasoptics.client.SaaSOpticsClient")
+    @patch("singer.utils.parse_args")
+    @patch("json.dump")
+    def test_module_executes_main_when_run_as_script(
+        self,
+        mock_json_dump,
+        mock_parse_args,
+        mock_client_cls,
+        mock_discover,
+    ):
+        parsed_args = argparse.Namespace(
+            config={
+                "token": "token",
+                "account_name": "acct",
+                "server_subdomain": "sub",
+                "user_agent": "ua",
+                "start_date": "2025-01-01T00:00:00Z",
+            },
+            state=None,
+            discover=True,
+            catalog=None,
+        )
+        mock_parse_args.return_value = parsed_args
+        mock_client_cls.return_value.__enter__.return_value = MagicMock()
+        mock_discover.return_value = MagicMock(to_dict=MagicMock(return_value={"streams": []}))
+
+        runpy.run_module("tap_saasoptics.__init__", run_name="__main__")
+
+        mock_parse_args.assert_called_once_with(tap_main.REQUIRED_CONFIG_KEYS)
+        self.assertTrue(mock_json_dump.called)
