@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch, call
 from singer.utils import strptime_to_utc, strftime
 
+from datetime import datetime, timezone
 from tap_saasoptics.sync import (
     get_bookmark,
     write_bookmark,
@@ -9,6 +10,14 @@ from tap_saasoptics.sync import (
     update_currently_syncing,
     sync_endpoint,
     sync,
+)
+
+from tap_saasoptics.sync import (
+    write_schema,
+    write_record,
+    transform_datetime,
+    process_records,
+    sync_endpoint,
 )
 
 
@@ -342,3 +351,111 @@ class TestSync(unittest.TestCase):
         calls = mock_update_syncing.call_args_list
         self.assertEqual(calls[0], call({}, "customers"))
         self.assertEqual(calls[1], call({}, None))
+
+
+class TestSyncAdditional(unittest.TestCase):
+    @patch("tap_saasoptics.sync.singer.write_schema", side_effect=OSError("boom"))
+    def test_write_schema_reraises_oserror(self, _mock_write_schema):
+        stream = MagicMock()
+        stream.schema.to_dict.return_value = {"type": "object", "properties": {}}
+        stream.key_properties = ["id"]
+        catalog = MagicMock()
+        catalog.get_stream.return_value = stream
+
+        with self.assertRaises(OSError):
+            write_schema(catalog, "accounts")
+
+    @patch("tap_saasoptics.sync.singer.messages.write_record", side_effect=OSError("boom"))
+    def test_write_record_reraises_oserror(self, _mock_write_record):
+        with self.assertRaises(OSError):
+            write_record("accounts", {"id": 1}, time_extracted=datetime.now(timezone.utc))
+
+    def test_transform_datetime_normalizes_datetime_string(self):
+        output = transform_datetime("2025-01-01T00:00:00Z")
+        self.assertEqual(output, "2025-01-01T00:00:00.000000Z")
+
+
+    @patch("tap_saasoptics.sync.process_records")
+    @patch("tap_saasoptics.sync.transform_json")
+    @patch("tap_saasoptics.sync.write_bookmark")
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_sync_endpoint_builds_datetime_window_query_and_updates_bookmark(
+        self,
+        mock_now,
+        _mock_write_schema,
+        mock_write_bookmark,
+        mock_transform_json,
+        mock_process_records,
+    ):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        mock_transform_json.return_value = [{"id": "1", "modified": "2025-01-01T12:00:00Z"}]
+        mock_process_records.return_value = ("2025-01-01T12:00:00.000000Z", 1)
+
+        client = MagicMock()
+        client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = {"count": 1, "next": None, "results": [{"id": "1"}]}
+
+        catalog = MagicMock()
+        state = {"bookmarks": {"customers": "2025-01-01T00:00:00Z"}}
+
+        total = sync_endpoint(
+            client=client,
+            catalog=catalog,
+            state=state,
+            start_date="2024-12-01T00:00:00Z",
+            stream_name="customers",
+            path="customers",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={"ordering": "modified"},
+            bookmark_query_field_from="modified__gte",
+            bookmark_query_field_to="modified__lte",
+            bookmark_field="modified",
+            bookmark_type="datetime",
+            data_key="results",
+            id_fields=["id"],
+            days_interval=1,
+        )
+
+        self.assertEqual(total, 1)
+        params_sent = client.get.call_args.kwargs["params"]
+        self.assertIn("modified__gte=2025-01-01T00:00:00.000000Z", params_sent)
+        self.assertIn("modified__lte=2025-01-02T00:00:00.000000Z", params_sent)
+        mock_write_bookmark.assert_called_once()
+
+    @patch("tap_saasoptics.sync.process_records")
+    @patch("tap_saasoptics.sync.transform_json", return_value=[])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_sync_endpoint_exits_when_transformation_empty(
+        self,
+        mock_now,
+        _mock_write_schema,
+        _mock_transform_json,
+        mock_process_records,
+    ):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        client = MagicMock()
+        client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = {"count": 1, "next": None, "results": [{"id": "1"}]}
+
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        self.assertEqual(total, 0)
+        mock_process_records.assert_not_called()
