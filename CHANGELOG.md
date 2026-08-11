@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+  * Upgrade python version to 3.12 [#12](https://github.com/singer-io/tap-saasoptics/pull/12)
+  * Add mock-integration tests
+
 ## 1.1.2
   * Bump depenedencies [#10](https://github.com/singer-io/tap-saasoptics/pull/10)
 
