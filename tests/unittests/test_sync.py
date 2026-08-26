@@ -535,3 +535,283 @@ class TestSyncAdditional(unittest.TestCase):
         self.assertEqual(total, 1)
         params_sent = client.get.call_args.kwargs["params"]
         self.assertIn("seq__gte=0", params_sent)
+
+
+class TestSyncEndpointPaginationUrlValidation(unittest.TestCase):
+    """The upstream-supplied `next` URL must be validated before being used."""
+
+    @staticmethod
+    def _client(pages):
+        from tap_saasoptics.client import SaaSOpticsClient
+
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        client._SaaSOpticsClient__verified = True
+        client.get = MagicMock(side_effect=pages)
+        return client
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_rejects_next_url_outside_the_base_url(
+        self, mock_now, _mock_write_schema, _mock_transform_json, _mock_process_records
+    ):
+        from tap_saasoptics.client import SaaSOpticsUnsafeUrlError
+
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        client = self._client([{
+            "count": 2,
+            "next": "http://app-smart-schema-registry.central.internal.lan/subjects",
+            "results": [{"id": "1"}],
+        }])
+
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            sync_endpoint(
+                client=client,
+                catalog=MagicMock(),
+                state={},
+                start_date="2025-01-01T00:00:00Z",
+                stream_name="accounts",
+                path="accounts",
+                endpoint_config={"key_properties": ["id"]},
+                static_params={},
+                bookmark_query_field_from=None,
+                bookmark_query_field_to=None,
+                bookmark_field=None,
+                bookmark_type=None,
+                data_key="results",
+                id_fields=["id"],
+                days_interval=60,
+            )
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_accepts_next_url_inside_the_base_url(
+        self, mock_now, _mock_write_schema, _mock_transform_json, _mock_process_records
+    ):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        next_url = "https://sub.saasoptics.com/acct/api/v1.0/accounts/?page=2"
+        client = self._client([
+            {"count": 2, "next": next_url, "results": [{"id": "1"}]},
+            {"count": 2, "next": None, "results": [{"id": "2"}]},
+        ])
+
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        self.assertEqual(total, 2)
+        self.assertEqual(client.get.call_args_list[1].kwargs["url"], next_url)
+
+
+class TestSyncEndpointDoesNotLogResponseBody(unittest.TestCase):
+    """The untransformable response body must never reach the tenant log."""
+
+    @patch("tap_saasoptics.sync.LOGGER.info")
+    @patch("tap_saasoptics.sync.transform_json", return_value=[])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_response_body_is_not_logged(
+        self, mock_now, _mock_write_schema, _mock_transform_json, mock_log_info
+    ):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        secret = "mongodb-shared-tipaas-connections-value"
+        client = MagicMock()
+        client.base_url = "https://sub.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = [secret]
+
+        sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        logged = " ".join(str(call) for call in mock_log_info.call_args_list)
+        self.assertNotIn(secret, logged)
+
+
+class TestSyncBranchCoverage(unittest.TestCase):
+    """Cover the remaining conditional edges in sync.py."""
+
+    @staticmethod
+    def _catalog():
+        stream = MagicMock()
+        stream.schema.to_dict.return_value = {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "modified": {"type": "string", "format": "date-time"},
+                "seq": {"type": "integer"},
+            },
+        }
+        stream.metadata = []
+        catalog = MagicMock()
+        catalog.get_stream.return_value = stream
+        return catalog
+
+    @patch("tap_saasoptics.sync.write_record")
+    def test_record_without_the_bookmark_field_is_always_written(self, mock_write_record):
+        """A record missing `bookmark_field` cannot be filtered, so it is written."""
+        from singer.utils import now
+
+        _max_bv, count = process_records(
+            catalog=self._catalog(),
+            stream_name="accounts",
+            records=[{"id": "1"}],
+            time_extracted=now(),
+            bookmark_field="modified",
+            bookmark_type="datetime",
+            max_bookmark_value=None,
+            last_datetime="2025-01-01T00:00:00Z",
+            last_integer=None,
+        )
+
+        self.assertEqual(count, 1)
+        mock_write_record.assert_called_once()
+
+    @patch("tap_saasoptics.sync.write_record")
+    def test_unknown_bookmark_type_writes_nothing(self, mock_write_record):
+        """A record with a bookmark field but an unknown bookmark_type is dropped."""
+        from singer.utils import now
+
+        _max_bv, count = process_records(
+            catalog=self._catalog(),
+            stream_name="accounts",
+            records=[{"id": "1", "seq": 5}],
+            time_extracted=now(),
+            bookmark_field="seq",
+            bookmark_type="unsupported",
+            max_bookmark_value=None,
+            last_datetime=None,
+            last_integer=None,
+        )
+
+        self.assertEqual(count, 0)
+        mock_write_record.assert_not_called()
+
+    @patch("tap_saasoptics.sync.write_record")
+    def test_integer_bookmark_below_last_integer_is_skipped(self, mock_write_record):
+        """INCREMENTAL (integer): records before last_integer must be skipped."""
+        from singer.utils import now
+
+        _max_bv, count = process_records(
+            catalog=self._catalog(),
+            stream_name="accounts",
+            records=[{"id": "1", "seq": 1}],
+            time_extracted=now(),
+            bookmark_field="seq",
+            bookmark_type="integer",
+            max_bookmark_value=None,
+            last_datetime=None,
+            last_integer=10,
+        )
+
+        self.assertEqual(count, 0)
+        mock_write_record.assert_not_called()
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_bookmark_query_field_from_without_a_known_bookmark_type(
+        self, mock_now, _mock_write_schema, _mock_transform_json, _mock_process_records
+    ):
+        """`bookmark_query_field_from` set with no datetime/integer bookmark_type."""
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        client = MagicMock()
+        client.base_url = "https://sub.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = {"count": 1, "next": None, "results": [{"id": "1"}]}
+
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from="modified_since",
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        self.assertEqual(total, 1)
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 100))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_page_is_not_the_last_page_of_total_records(
+        self, mock_now, _mock_write_schema, _mock_transform_json, _mock_process_records
+    ):
+        """A full page that does not reach `count` must not clamp `to_rec`."""
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        client = MagicMock()
+        client.base_url = "https://sub.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = {"count": 200, "next": None, "results": [{"id": "1"}]}
+
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        self.assertEqual(total, 200)
+
+    @patch("tap_saasoptics.sync.singer.write_state")
+    @patch("tap_saasoptics.sync.update_currently_syncing")
+    def test_sync_without_a_start_date_in_config(
+        self, _mock_update_currently_syncing, _mock_write_state
+    ):
+        """`sync()` must not fail when `start_date` is absent and no stream is selected."""
+        catalog = MagicMock()
+        catalog.get_selected_streams.return_value = []
+
+        sync(client=MagicMock(), config={}, catalog=catalog, state={})
+
+        catalog.get_selected_streams.assert_called_once_with({})

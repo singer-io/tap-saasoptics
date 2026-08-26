@@ -186,6 +186,8 @@ This tap:
 
 3. Create your tap's `config.json` file. The `server_subdomain` is everything before `.saasoptics.com.` in the SaaSOptics URL.  The `account_name` is everything between `.saasoptics.com.` and `api` in the SaaSOptics URL. The `date_window_size` is the integer number of days (between the from and to dates) for date-windowing through the date-filtered endpoints (default = 60).
 
+    The `server_subdomain` must be a single hostname label (letters, digits and hyphens only) and the `account_name` must be a single URL path segment; the tap rejects any other value, only ever requests URLs under `https://{server_subdomain}.saasoptics.com/{account_name}/api/v1.0/`, and does not follow redirects.
+
     ```json
     {
         "token": "YOUR_API_TOKEN",
