@@ -542,3 +542,52 @@ class TestClientConstruction(unittest.TestCase):
     def test_unsafe_account_name_raises(self):
         with self.assertRaises(SaaSOpticsConfigurationError):
             SaaSOpticsClient("token", "../../evil", "sub", "ua")
+
+
+class TestClientBranchCoverage(unittest.TestCase):
+    """Cover the remaining conditional edges in client.py."""
+
+    def test_check_token_omits_user_agent_header_when_not_configured(self):
+        client = SaaSOpticsClient("token", "acct", "sub")
+        session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"results": []}
+        session.get.return_value = response
+        client._SaaSOpticsClient__session = session
+
+        self.assertTrue(client.check_token())
+        self.assertNotIn("User-Agent", session.get.call_args.kwargs["headers"])
+
+    @patch("tap_saasoptics.client.metrics.http_request_timer")
+    def test_request_reuses_caller_supplied_headers(self, mock_timer):
+        timer_cm = MagicMock()
+        timer_cm.__enter__.return_value = MagicMock(tags={})
+        timer_cm.__exit__.return_value = False
+        mock_timer.return_value = timer_cm
+
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        client._SaaSOpticsClient__verified = True
+        session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"results": []}
+        session.request.return_value = response
+        client._SaaSOpticsClient__session = session
+
+        client.request("GET", path="accounts", headers={"X-Test": "1"})
+
+        headers = session.request.call_args.kwargs["headers"]
+        self.assertEqual(headers["X-Test"], "1")
+        self.assertEqual(headers["Authorization"], "Token token")
+
+    def test_check_token_returns_false_when_results_key_is_absent(self):
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"detail": "no results key"}
+        session.get.return_value = response
+        client._SaaSOpticsClient__session = session
+
+        self.assertFalse(client.check_token())
