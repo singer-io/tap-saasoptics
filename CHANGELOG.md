@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+  * SAC-32056: Fix SSRF in the SaaSOptics client. Validate the `server_subdomain` and `account_name` config values, reject request URLs (including paginated `next` URLs) outside of the SaaSOptics API base URL, stop following redirects, and stop logging the upstream response body.
+
 ## 1.2.0
   * Upgrade python version to 3.12 [#12](https://github.com/singer-io/tap-saasoptics/pull/12)
   * Add mock-integration tests

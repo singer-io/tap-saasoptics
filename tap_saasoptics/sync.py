@@ -210,7 +210,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 transformed_data = transform_json(data, stream_name, data_key)
             # LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
             if not transformed_data or transformed_data is None:
-                LOGGER.info('No transformed data for data = {}'.format(data))
+                # Never log the upstream response body: it may contain data from
+                # a host other than the SaaSOptics API.
+                LOGGER.info('No transformed data for Stream {}, page {}'.format(
+                    stream_name, page))
                 total_records = 0
                 break # No data results
 
@@ -231,6 +234,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
             # set total_records and next_url for pagination
             total_records = data.get('count', 0)
             next_url = data.get('next', None)
+            if next_url is not None:
+                # The upstream response controls this URL; make sure it still
+                # points inside the SaaSOptics API before using or logging it.
+                next_url = client.validate_url(next_url)
 
             # Update the state with the max_bookmark_value for the stream
             if bookmark_field:
