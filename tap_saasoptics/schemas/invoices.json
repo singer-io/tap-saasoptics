@@ -90,6 +90,9 @@
     "ei_theme": {
       "type": ["null", "integer"]
     },
+    "einvoicing_url": {
+      "type": ["null", "string"]
+    },
     "email_from_so": {
       "type": ["null", "boolean"]
     },
@@ -119,6 +122,18 @@
     "is_paid": {
       "type": ["null", "boolean"]
     },
+    "last_emailed": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "last_clicked": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "last_opened": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },    
     "line_items": {
       "anyOf": [
         {
