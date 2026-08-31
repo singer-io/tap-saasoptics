@@ -78,6 +78,14 @@ class TestRaiseForError(unittest.TestCase):
         with self.assertRaises(SaaSOpticsError):
             raise_for_error(resp)
 
+    def test_raises_saasoptics_error_when_json_parse_fails(self):
+        """JSON parse errors should be wrapped in SaaSOpticsError."""
+        resp = self._make_response(500)
+        resp.json.side_effect = ValueError("bad json")
+
+        with self.assertRaises(SaaSOpticsError):
+            raise_for_error(resp)
+
 
 class TestSaaSOpticsClientCheckToken(unittest.TestCase):
     """Unit tests for SaaSOpticsClient.check_token()."""
@@ -240,3 +248,93 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client.get(path="billing_descriptions", url="https://example.com/api/v1.0/billing_descriptions/")
         call_args = mock_session.request.call_args
         self.assertEqual(call_args[0][0], "GET")
+
+    @patch("tap_saasoptics.client.metrics.http_request_timer")
+    def test_request_calls_check_token_when_unverified(self, mock_timer):
+        timer_cm = MagicMock()
+        timer_cm.__enter__.return_value = MagicMock(tags={})
+        timer_cm.__exit__.return_value = False
+        mock_timer.return_value = timer_cm
+
+        client = SaaSOpticsClient("test-token", "test-account", "test-subdomain")
+        client._SaaSOpticsClient__session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"results": []}
+        client._SaaSOpticsClient__session.request.return_value = response
+        client.check_token = MagicMock(return_value=True)
+
+        client.request("GET", url="https://example.com/api/v1.0/customers/")
+
+        client.check_token.assert_called_once_with()
+
+
+class TestClientAdditional(unittest.TestCase):
+    def test_context_manager_enters_and_exits(self):
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        client.check_token = MagicMock(return_value=True)
+        client._SaaSOpticsClient__session = MagicMock()
+
+        with client as entered:
+            self.assertIs(entered, client)
+
+        client.check_token.assert_called_once_with()
+        client._SaaSOpticsClient__session.close.assert_called_once_with()
+
+    def test_check_token_raises_when_token_missing(self):
+        client = SaaSOpticsClient(None, "acct", "sub", "ua")
+        with self.assertRaises(Exception):
+            client.check_token()
+
+    @patch("tap_saasoptics.client.metrics.http_request_timer")
+    def test_request_builds_url_from_path_and_sets_headers_for_post(self, mock_timer):
+        timer_cm = MagicMock()
+        timer_cm.__enter__.return_value = MagicMock(tags={})
+        timer_cm.__exit__.return_value = False
+        mock_timer.return_value = timer_cm
+
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        client._SaaSOpticsClient__verified = True
+        client._SaaSOpticsClient__session = MagicMock()
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"ok": True}
+        client._SaaSOpticsClient__session.request.return_value = response
+
+        result = client.request("POST", path="accounts", endpoint="accounts")
+
+        self.assertEqual(result, {"ok": True})
+        call_kwargs = client._SaaSOpticsClient__session.request.call_args.kwargs
+        self.assertEqual(
+            client._SaaSOpticsClient__session.request.call_args.args[1],
+            "https://sub.saasoptics.com/acct/api/v1.0/accounts/",
+        )
+        self.assertEqual(call_kwargs["headers"]["Content-Type"], "application/json")
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Token token")
+        self.assertEqual(call_kwargs["headers"]["User-Agent"], "ua")
+
+    @patch("tap_saasoptics.client.LOGGER.error")
+    def test_raise_for_error_logs_expired_token_message(self, mock_log):
+        response = MagicMock()
+        response.status_code = 401
+        response.content = b"expired"
+        response.raise_for_status.side_effect = requests.HTTPError(response=response)
+        response.json.return_value = {
+            "error": {"code": 401},
+            "message": "Expired token in account",
+        }
+
+        with self.assertRaises(SaaSOpticsUnauthorizedError):
+            raise_for_error(response)
+
+        mock_log.assert_called_once()
+
+    @patch("tap_saasoptics.client.SaaSOpticsClient.request")
+    def test_post_delegates_to_request(self, mock_request):
+        mock_request.return_value = {"ok": True}
+        client = SaaSOpticsClient("token", "acct", "sub")
+
+        result = client.post("accounts", json={"x": 1})
+
+        self.assertEqual(result, {"ok": True})
+        mock_request.assert_called_once_with("POST", path="accounts", json={"x": 1})
