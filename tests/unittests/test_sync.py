@@ -1,9 +1,11 @@
 import unittest
 from unittest.mock import MagicMock, patch, call
 from singer.utils import strptime_to_utc, strftime
-
 from datetime import datetime, timezone
 from tap_saasoptics.sync import (
+    write_schema,
+    write_record,
+    transform_datetime,
     get_bookmark,
     write_bookmark,
     process_records,
@@ -12,13 +14,6 @@ from tap_saasoptics.sync import (
     sync,
 )
 
-from tap_saasoptics.sync import (
-    write_schema,
-    write_record,
-    transform_datetime,
-    process_records,
-    sync_endpoint,
-)
 
 
 # ---------------------------------------------------------------------------
