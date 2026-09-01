@@ -71,8 +71,8 @@ class TestAccessChecks(unittest.TestCase):
             client.get.side_effect,
         )
 
-    def test_apply_access_checks_includes_pruned_children_in_consolidated_warning(self):
-        """Consolidated warning should include inaccessible parents and pruned child streams."""
+    def test_apply_access_checks_warns_for_inaccessible_parent_streams(self):
+        """Warnings should list the inaccessible top-level streams that were excluded."""
         client = MagicMock()
         schemas = {'parent_stream': {}, 'child_stream': {}, 'other_stream': {}}
         field_metadata = {'parent_stream': [], 'child_stream': [], 'other_stream': []}
@@ -91,12 +91,12 @@ class TestAccessChecks(unittest.TestCase):
             _apply_access_checks(client, schemas, field_metadata)
 
         self.assertNotIn('parent_stream', schemas)
-        self.assertNotIn('child_stream', schemas)
+        self.assertIn('child_stream', schemas)
         self.assertIn('other_stream', schemas)
 
         warning_calls = [str(call) for call in mock_logger.warning.call_args_list]
-        self.assertTrue(any("Excluding unauthorized stream(s) from catalog:" in call for call in warning_calls))
-        self.assertTrue(any('parent_stream, child_stream' in call for call in warning_calls))
+        self.assertTrue(any('Unauthorized streams excluded from catalog:' in call for call in warning_calls))
+        self.assertTrue(any('parent_stream' in call for call in warning_calls))
 
     def test_apply_access_checks_raises_with_expected_message_when_no_stream_access(self):
         """No accessible streams should raise exact 403 error message."""
