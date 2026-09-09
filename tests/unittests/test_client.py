@@ -18,6 +18,37 @@ from tap_saasoptics.client import (
 )
 
 
+class TestSaaSOpticsClientConfigValidation(unittest.TestCase):
+    """server_subdomain / account_name must not be able to alter the request URL (SSRF)."""
+
+    def test_valid_values_build_expected_base_url(self):
+        client = SaaSOpticsClient("token", "acme-corp", "acme", "ua")
+        self.assertEqual(
+            client.base_url, "https://acme.saasoptics.com/acme-corp/api/v1.0"
+        )
+
+    def test_ssrf_payload_in_server_subdomain_is_rejected(self):
+        # The exact shape from the report: pushes the .saasoptics.com suffix
+        # into the query string and points the first hop at an arbitrary host.
+        with self.assertRaises(ValueError):
+            SaaSOpticsClient(
+                "token", "repro", "attacker.example.com/path?tail=", "ua"
+            )
+
+    def test_url_metacharacters_in_server_subdomain_are_rejected(self):
+        for bad in ["a/b", "a:b", "a?b", "a#b", "a@b", "a.b", "a b", "abc\n",
+                    "a\nb", ""]:
+            with self.subTest(server_subdomain=bad):
+                with self.assertRaises(ValueError):
+                    SaaSOpticsClient("token", "acct", bad, "ua")
+
+    def test_url_metacharacters_in_account_name_are_rejected(self):
+        for bad in ["a/b", "a?b", "a#b", "a@b", "a b", ""]:
+            with self.subTest(account_name=bad):
+                with self.assertRaises(ValueError):
+                    SaaSOpticsClient("token", bad, "sub", "ua")
+
+
 class TestGetExceptionForErrorCode(unittest.TestCase):
     """Unit tests for the error-code → exception-class mapping."""
 

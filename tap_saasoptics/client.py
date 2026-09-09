@@ -1,3 +1,4 @@
+import re
 import backoff
 import requests
 from requests.exceptions import ConnectionError
@@ -6,6 +7,19 @@ import singer
 
 API_VERSION = 'v1.0'
 LOGGER = singer.get_logger()
+
+# server_subdomain and account_name come from config and are interpolated
+# directly into the request URL. Restrict them to a safe character set so a
+# value cannot alter the URL host, path, or query.
+SERVER_SUBDOMAIN_RE = re.compile(r'^[A-Za-z0-9-]+$')
+ACCOUNT_NAME_RE = re.compile(r'^[A-Za-z0-9_-]+$')
+
+
+def validate_url_component(name, value, pattern):
+    if not isinstance(value, str) or not pattern.fullmatch(value):
+        raise ValueError(
+            'Invalid {}: only letters, digits, and the characters matched by '
+            '{} are allowed'.format(name, pattern.pattern))
 
 
 class Server5xxError(Exception):
@@ -101,6 +115,9 @@ class SaaSOpticsClient(object):
         self.__user_agent = user_agent
         self.__session = requests.Session()
         self.__verified = False
+        validate_url_component('server_subdomain', server_subdomain,
+                               SERVER_SUBDOMAIN_RE)
+        validate_url_component('account_name', account_name, ACCOUNT_NAME_RE)
         self.base_url = 'https://{}.saasoptics.com/{}/api/{}'.format(
             server_subdomain, account_name, API_VERSION)
 
