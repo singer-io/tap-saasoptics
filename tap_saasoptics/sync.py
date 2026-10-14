@@ -8,6 +8,10 @@ from tap_saasoptics.streams import STREAMS
 
 LOGGER = singer.get_logger()
 
+# Hard cap on pages per window, and extra pages allowed beyond ceil(count / limit)
+MAX_PAGES = 100000
+PAGE_SLACK = 10
+
 
 def write_schema(catalog, stream_name):
     stream = catalog.get_stream(stream_name)
@@ -172,7 +176,19 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         offset = 0
         limit = 100 # Default limit for SaaSOptics API, unable to change this in v1.0
         total_records = 0
+        seen_urls = set()
+        max_pages = MAX_PAGES
         while next_url is not None:
+            # Guard against a server that never stops paginating
+            if next_url in seen_urls:
+                LOGGER.warning('Stream {}: next URL repeated, stopping pagination: {}'.format(
+                    stream_name, next_url))
+                break
+            if page > max_pages:
+                LOGGER.warning('Stream {}: exceeded max pages ({}), stopping pagination'.format(
+                    stream_name, max_pages))
+                break
+            seen_urls.add(next_url)
             # Need URL querystring for 1st page; subsequent pages provided by next_url
             # querystring: Squash query params into string
             if page == 1 and not params == {}:
@@ -231,6 +247,9 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
             # set total_records and next_url for pagination
             total_records = data.get('count', 0)
             next_url = data.get('next', None)
+            # Bound pages by the server-reported count (plus slack for records added mid-sync)
+            if isinstance(total_records, int) and total_records > 0:
+                max_pages = min(MAX_PAGES, math.ceil(total_records / limit) + PAGE_SLACK)
 
             # Update the state with the max_bookmark_value for the stream
             if bookmark_field:

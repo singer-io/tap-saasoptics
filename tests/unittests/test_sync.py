@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from singer.utils import strptime_to_utc, strftime
 
 from datetime import datetime, timezone
+from tap_saasoptics.sync import PAGE_SLACK
 from tap_saasoptics.sync import (
     get_bookmark,
     write_bookmark,
@@ -535,3 +536,55 @@ class TestSyncAdditional(unittest.TestCase):
         self.assertEqual(total, 1)
         params_sent = client.get.call_args.kwargs["params"]
         self.assertIn("seq__gte=0", params_sent)
+
+
+class TestPaginationBounds(unittest.TestCase):
+    """A server must not be able to make the page loop run forever."""
+
+    def _run(self, get_side_effect, mock_now):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        client = MagicMock()
+        client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
+        client.get.side_effect = get_side_effect
+        total = sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="customers",
+            path="customers",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type="datetime",
+            data_key="results",
+            id_fields=["id"],
+            days_interval=1,
+        )
+        return client, total
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_stops_when_next_url_repeats(self, mock_now, _ws, _tj, _pr):
+        same = "https://dummy.saasoptics.com/acct/api/v1.0/customers/?page=2"
+        resp = {"count": 100000, "next": same, "results": [{"id": "1"}]}
+        client, _ = self._run(lambda **kw: resp, mock_now)
+        # page 1 (base url) + page 2 (same) then the repeat is rejected
+        self.assertEqual(client.get.call_count, 2)
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_stops_after_max_pages_derived_from_count(self, mock_now, _ws, _tj, _pr):
+        counter = iter(range(1000))
+        def get(**kw):
+            return {"count": 100, "next": "https://x/customers/?page=%d" % next(counter),
+                    "results": [{"id": "1"}]}
+        client, _ = self._run(get, mock_now)
+        # ceil(100 / 100) + PAGE_SLACK pages at most
+        self.assertEqual(client.get.call_count, 1 + PAGE_SLACK)
