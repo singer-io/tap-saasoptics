@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from singer.utils import strptime_to_utc, strftime
 
 from datetime import datetime, timezone
-from tap_saasoptics.sync import PAGE_SLACK
+from tap_saasoptics.sync import PAGE_SLACK, MAX_PAGES, get_max_pages
 from tap_saasoptics.sync import (
     get_bookmark,
     write_bookmark,
@@ -541,7 +541,7 @@ class TestSyncAdditional(unittest.TestCase):
 class TestPaginationBounds(unittest.TestCase):
     """A server must not be able to make the page loop run forever."""
 
-    def _run(self, get_side_effect, mock_now):
+    def _run(self, get_side_effect, mock_now, **extra):
         mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
         client = MagicMock()
         client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
@@ -562,6 +562,7 @@ class TestPaginationBounds(unittest.TestCase):
             data_key="results",
             id_fields=["id"],
             days_interval=1,
+            **extra
         )
         return client, total
 
@@ -588,3 +589,57 @@ class TestPaginationBounds(unittest.TestCase):
         client, _ = self._run(get, mock_now)
         # ceil(100 / 100) + PAGE_SLACK pages at most
         self.assertEqual(client.get.call_count, 1 + PAGE_SLACK)
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_configured_cap_limits_pages_without_count(self, mock_now, _ws, _tj, _pr):
+        counter = iter(range(1000))
+        def get(**kw):
+            # no usable count, so only the configured cap applies
+            return {"next": "https://x/customers/?page=%d" % next(counter),
+                    "results": [{"id": "1"}]}
+        client, _ = self._run(get, mock_now, max_pages_cap=3)
+        self.assertEqual(client.get.call_count, 3)
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_configured_cap_overrides_count_based_bound(self, mock_now, _ws, _tj, _pr):
+        counter = iter(range(1000))
+        def get(**kw):
+            return {"count": 1000000, "next": "https://x/customers/?page=%d" % next(counter),
+                    "results": [{"id": "1"}]}
+        client, _ = self._run(get, mock_now, max_pages_cap=5)
+        self.assertEqual(client.get.call_count, 5)
+
+
+class TestGetMaxPages(unittest.TestCase):
+    def test_defaults_when_missing_or_empty(self):
+        self.assertEqual(get_max_pages({}), MAX_PAGES)
+        self.assertEqual(get_max_pages({"max_pages": None}), MAX_PAGES)
+        self.assertEqual(get_max_pages({"max_pages": ""}), MAX_PAGES)
+
+    def test_accepts_int_and_string(self):
+        self.assertEqual(get_max_pages({"max_pages": 50}), 50)
+        self.assertEqual(get_max_pages({"max_pages": "250"}), 250)
+
+    def test_rejects_invalid_values(self):
+        for bad in ("abc", 0, -1, "0", [], "1.5"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    get_max_pages({"max_pages": bad})
+
+    @patch("tap_saasoptics.sync.singer.write_state")
+    @patch("tap_saasoptics.sync.update_currently_syncing")
+    @patch("tap_saasoptics.sync.sync_endpoint", return_value=0)
+    def test_sync_passes_configured_cap_to_sync_endpoint(self, mock_endpoint, _us, _ws):
+        stream = MagicMock()
+        stream.stream = "customers"
+        catalog = MagicMock()
+        catalog.get_selected_streams.return_value = [stream]
+        config = {"start_date": "2025-01-01T00:00:00Z", "max_pages": "42"}
+        sync(client=MagicMock(), config=config, catalog=catalog, state={})
+        self.assertEqual(mock_endpoint.call_args.kwargs["max_pages_cap"], 42)

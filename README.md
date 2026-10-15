@@ -184,7 +184,7 @@ This tap:
     - [singer-tools](https://github.com/singer-io/singer-tools)
     - [target-stitch](https://github.com/singer-io/target-stitch)
 
-3. Create your tap's `config.json` file. The `server_subdomain` is everything before `.saasoptics.com.` in the SaaSOptics URL.  The `account_name` is everything between `.saasoptics.com.` and `api` in the SaaSOptics URL. The `date_window_size` is the integer number of days (between the from and to dates) for date-windowing through the date-filtered endpoints (default = 60).
+3. Create your tap's `config.json` file. The `server_subdomain` is everything before `.saasoptics.com.` in the SaaSOptics URL.  The `account_name` is everything between `.saasoptics.com.` and `api` in the SaaSOptics URL. The `date_window_size` is the integer number of days (between the from and to dates) for date-windowing through the date-filtered endpoints (default = 60). The optional `max_pages` is a safety cap on the number of pages fetched per stream and date window (default = 100000, i.e. 10 million records at 100 per page). If a stream reaches it, pagination stops with a warning, so raise it if you have a stream with more records than that in one window.
 
     ```json
     {
