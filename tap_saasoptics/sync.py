@@ -3,6 +3,7 @@ import math
 import singer
 from singer import metrics, metadata, Transformer, utils
 from singer.utils import strptime_to_utc, strftime
+from tap_saasoptics.client import SaaSOpticsError
 from tap_saasoptics.transform import transform_json
 from tap_saasoptics.streams import STREAMS
 
@@ -194,16 +195,26 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         total_records = 0
         seen_urls = set()
         max_pages = max_pages_cap
+        count_max_pages = None # page bound derived from the server-reported count
         while next_url is not None:
-            # Guard against a server that never stops paginating
+            # Guard against a server that never stops paginating. Fail loudly rather than
+            # moving on, which would leave a silent gap in the extracted data.
             if next_url in seen_urls:
-                LOGGER.warning('Stream {}: next URL repeated, stopping pagination: {}'.format(
-                    stream_name, next_url))
-                break
+                raise SaaSOpticsError(
+                    'Stream {}: next URL repeated on page {}, aborting sync to avoid an '
+                    'infinite pagination loop: {}'.format(stream_name, page, next_url))
             if page > max_pages:
-                LOGGER.warning('Stream {}: exceeded max pages ({}), stopping pagination'.format(
-                    stream_name, max_pages))
-                break
+                if count_max_pages is not None and count_max_pages <= max_pages_cap:
+                    raise SaaSOpticsError(
+                        'Stream {}: API returned more than {} pages, which exceeds the '
+                        'number implied by its reported record count. Aborting sync; '
+                        'this indicates an API issue, and raising max_pages will not '
+                        'help.'.format(stream_name, max_pages))
+                raise SaaSOpticsError(
+                    'Stream {}: reached the max_pages limit ({}) before pagination '
+                    'finished. Aborting sync to avoid incomplete extraction. Increase '
+                    'max_pages in the config if this stream legitimately has that much '
+                    'data, otherwise investigate the API.'.format(stream_name, max_pages))
             seen_urls.add(next_url)
             # Need URL querystring for 1st page; subsequent pages provided by next_url
             # querystring: Squash query params into string
@@ -265,7 +276,8 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
             next_url = data.get('next', None)
             # Bound pages by the server-reported count (plus slack for records added mid-sync)
             if isinstance(total_records, int) and total_records > 0:
-                max_pages = min(max_pages_cap, math.ceil(total_records / limit) + PAGE_SLACK)
+                count_max_pages = math.ceil(total_records / limit) + PAGE_SLACK
+                max_pages = min(max_pages_cap, count_max_pages)
 
             # Update the state with the max_bookmark_value for the stream
             if bookmark_field:

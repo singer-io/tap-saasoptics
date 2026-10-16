@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from singer.utils import strptime_to_utc, strftime
 
 from datetime import datetime, timezone
+from tap_saasoptics.client import SaaSOpticsError
 from tap_saasoptics.sync import PAGE_SLACK, MAX_PAGES, get_max_pages
 from tap_saasoptics.sync import (
     get_bookmark,
@@ -541,9 +542,9 @@ class TestSyncAdditional(unittest.TestCase):
 class TestPaginationBounds(unittest.TestCase):
     """A server must not be able to make the page loop run forever."""
 
-    def _run(self, get_side_effect, mock_now, **extra):
+    def _run(self, get_side_effect, mock_now, client=None, **extra):
         mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
-        client = MagicMock()
+        client = client or MagicMock()
         client.base_url = "https://dummy.saasoptics.com/acct/api/v1.0"
         client.get.side_effect = get_side_effect
         total = sync_endpoint(
@@ -570,50 +571,78 @@ class TestPaginationBounds(unittest.TestCase):
     @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
     @patch("tap_saasoptics.sync.write_schema")
     @patch("tap_saasoptics.sync.utils.now")
-    def test_stops_when_next_url_repeats(self, mock_now, _ws, _tj, _pr):
+    def test_raises_when_next_url_repeats(self, mock_now, _ws, _tj, _pr):
         same = "https://dummy.saasoptics.com/acct/api/v1.0/customers/?page=2"
         resp = {"count": 100000, "next": same, "results": [{"id": "1"}]}
-        client, _ = self._run(lambda **kw: resp, mock_now)
-        # page 1 (base url) + page 2 (same) then the repeat is rejected
+        client = MagicMock()
+        with self.assertRaises(SaaSOpticsError) as ctx:
+            self._run(lambda **kw: resp, mock_now, client=client)
+        self.assertIn("repeated", str(ctx.exception))
+        # page 1 (base url) + page 2 (same), then the repeat is rejected before a 3rd request
         self.assertEqual(client.get.call_count, 2)
 
     @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
     @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
     @patch("tap_saasoptics.sync.write_schema")
     @patch("tap_saasoptics.sync.utils.now")
-    def test_stops_after_max_pages_derived_from_count(self, mock_now, _ws, _tj, _pr):
+    def test_raises_when_count_based_bound_exceeded(self, mock_now, _ws, _tj, _pr):
         counter = iter(range(1000))
         def get(**kw):
             return {"count": 100, "next": "https://x/customers/?page=%d" % next(counter),
                     "results": [{"id": "1"}]}
-        client, _ = self._run(get, mock_now)
+        client = MagicMock()
+        with self.assertRaises(SaaSOpticsError) as ctx:
+            self._run(get, mock_now, client=client)
         # ceil(100 / 100) + PAGE_SLACK pages at most
         self.assertEqual(client.get.call_count, 1 + PAGE_SLACK)
+        self.assertIn("reported record count", str(ctx.exception))
+        self.assertIn("will not help", str(ctx.exception))
 
     @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
     @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
     @patch("tap_saasoptics.sync.write_schema")
     @patch("tap_saasoptics.sync.utils.now")
-    def test_configured_cap_limits_pages_without_count(self, mock_now, _ws, _tj, _pr):
+    def test_raises_when_configured_cap_reached_without_count(self, mock_now, _ws, _tj, _pr):
         counter = iter(range(1000))
         def get(**kw):
             # no usable count, so only the configured cap applies
             return {"next": "https://x/customers/?page=%d" % next(counter),
                     "results": [{"id": "1"}]}
-        client, _ = self._run(get, mock_now, max_pages_cap=3)
+        client = MagicMock()
+        with self.assertRaises(SaaSOpticsError) as ctx:
+            self._run(get, mock_now, client=client, max_pages_cap=3)
         self.assertEqual(client.get.call_count, 3)
+        self.assertIn("max_pages limit (3)", str(ctx.exception))
+        self.assertIn("Increase", str(ctx.exception))
 
     @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
     @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
     @patch("tap_saasoptics.sync.write_schema")
     @patch("tap_saasoptics.sync.utils.now")
-    def test_configured_cap_overrides_count_based_bound(self, mock_now, _ws, _tj, _pr):
+    def test_configured_cap_overrides_larger_count_based_bound(self, mock_now, _ws, _tj, _pr):
         counter = iter(range(1000))
         def get(**kw):
             return {"count": 1000000, "next": "https://x/customers/?page=%d" % next(counter),
                     "results": [{"id": "1"}]}
-        client, _ = self._run(get, mock_now, max_pages_cap=5)
+        client = MagicMock()
+        with self.assertRaises(SaaSOpticsError) as ctx:
+            self._run(get, mock_now, client=client, max_pages_cap=5)
         self.assertEqual(client.get.call_count, 5)
+        self.assertIn("max_pages limit (5)", str(ctx.exception))
+
+    @patch("tap_saasoptics.sync.process_records", return_value=(None, 1))
+    @patch("tap_saasoptics.sync.transform_json", return_value=[{"id": "1"}])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_completes_normally_within_limits(self, mock_now, _ws, _tj, _pr):
+        pages = iter([
+            {"count": 200, "next": "https://x/customers/?page=2", "results": [{"id": "1"}]},
+            {"count": 200, "next": None, "results": [{"id": "2"}]},
+        ])
+        client = MagicMock()
+        _, total = self._run(lambda **kw: next(pages), mock_now, client=client)
+        self.assertEqual(client.get.call_count, 2)
+        self.assertEqual(total, 200)
 
 
 class TestGetMaxPages(unittest.TestCase):
