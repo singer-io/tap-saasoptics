@@ -123,10 +123,15 @@ class SaaSOpticsClient(object):
             headers['User-Agent'] = self.__user_agent
         headers['Authorization'] = 'Token {}'.format(self.__token)
         headers['Accept'] = 'application/json'
-        response = self.__session.get(
-            # Simple endpoint that returns 1 Account record (to check API/token access):
-            url='{}/{}/'.format(self.base_url, 'billing_descriptions'),
-            headers=headers)
+        try:
+            response = self.__session.get(
+                # Simple endpoint that returns 1 Account record (to check API/token access):
+                url='{}/{}/'.format(self.base_url, 'billing_descriptions'),
+                headers=headers)
+        except requests.RequestException as exc:
+            raise SaaSOpticsError(
+                    'Invalid SaaSOptics credentials or API endpoint. Check token, account_name, server_subdomain, and network config.'
+                ) from exc
         if response.status_code != 200:
             LOGGER.error('Error status_code = {}'.format(response.status_code))
             raise_for_error(response)

@@ -14,9 +14,11 @@ class TestMainModule(unittest.TestCase):
         mock_catalog.to_dict.return_value = {"streams": []}
         mock_discover.return_value = mock_catalog
 
-        tap_main.do_discover()
+        mock_client = MagicMock()
 
-        mock_discover.assert_called_once_with()
+        tap_main.do_discover(client=mock_client)
+
+        mock_discover.assert_called_once_with(mock_client)
         mock_dump.assert_called_once()
 
     @patch("tap_saasoptics.__init__.sync")
@@ -49,7 +51,7 @@ class TestMainModule(unittest.TestCase):
 
         tap_main.main()
 
-        mock_do_discover.assert_called_once_with()
+        mock_do_discover.assert_called_once_with(mock_client)
         mock_sync.assert_not_called()
 
     @patch("tap_saasoptics.__init__.sync")
