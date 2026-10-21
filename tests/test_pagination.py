@@ -35,6 +35,7 @@ class PaginationIntegrationTest(SaaSOpticsBaseTest, unittest.TestCase):
 
         mock_client = MagicMock()
         mock_client.base_url = base_url
+        mock_client.validate_url.side_effect = lambda url: url
         mock_client.get.side_effect = responses
         return mock_client
 
