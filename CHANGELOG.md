@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+  * Bound the pagination loop (repeated `next` URL / configurable `max_pages` cap) to prevent infinite pagination [#20](https://github.com/singer-io/tap-saasoptics/pull/20)
+  * SAC-32056: Measure branch coverage in CI, and cover the remaining conditional edges in `client.py`, `sync.py` and `__init__.py`.
+  * SAC-32056: Fix SSRF in the SaaSOptics client. Validate the `server_subdomain` and `account_name` config values, reject request URLs (including paginated `next` URLs) outside of the SaaSOptics API base URL, stop following redirects, and stop logging the upstream response body.
+
 ## 1.2.0
   * Upgrade python version to 3.12 [#12](https://github.com/singer-io/tap-saasoptics/pull/12)
   * Add mock-integration tests

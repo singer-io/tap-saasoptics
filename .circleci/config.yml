@@ -24,7 +24,7 @@ jobs:
             source /usr/local/share/virtualenvs/tap-saasoptics/bin/activate
             uv pip install pytest coverage
             mkdir -p test_output
-            coverage run --source=tap_saasoptics -m pytest tests/unittests --junitxml=test_output/report.xml
+            coverage run --branch --source=tap_saasoptics -m pytest tests/unittests --junitxml=test_output/report.xml
       - run:
           name: 'Coverage Report'
           command: |

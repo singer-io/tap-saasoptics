@@ -121,3 +121,33 @@ class TestMainModule(unittest.TestCase):
 
         mock_parse_args.assert_called_once_with(tap_main.REQUIRED_CONFIG_KEYS)
         self.assertTrue(mock_json_dump.called)
+
+
+class TestMainBranchCoverage(unittest.TestCase):
+    """Cover the remaining conditional edges in __init__.py."""
+
+    @patch("tap_saasoptics.__init__.sync")
+    @patch("tap_saasoptics.__init__.do_discover")
+    @patch("tap_saasoptics.__init__.SaaSOpticsClient")
+    @patch("tap_saasoptics.__init__.singer.utils.parse_args")
+    def test_main_does_nothing_without_discover_or_catalog(
+        self, mock_parse_args, mock_client_cls, mock_do_discover, mock_sync
+    ):
+        mock_parse_args.return_value = argparse.Namespace(
+            config={
+                "token": "token",
+                "account_name": "acct",
+                "server_subdomain": "sub",
+                "user_agent": "ua",
+                "start_date": "2025-01-01T00:00:00Z",
+            },
+            state=None,
+            discover=False,
+            catalog=None,
+        )
+        mock_client_cls.return_value.__enter__.return_value = MagicMock()
+
+        tap_main.main()
+
+        mock_do_discover.assert_not_called()
+        mock_sync.assert_not_called()
