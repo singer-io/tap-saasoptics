@@ -76,7 +76,7 @@ def validate_server_subdomain(server_subdomain):
     SaaSOptics hostname label. The offending value is never echoed back.
     """
     if not isinstance(server_subdomain, str) or \
-            not SERVER_SUBDOMAIN_PATTERN.match(server_subdomain):
+            not SERVER_SUBDOMAIN_PATTERN.fullmatch(server_subdomain):
         raise SaaSOpticsConfigurationError(
             'Invalid `server_subdomain` in config: it must be a single SaaSOptics '
             'hostname label containing only letters, digits and hyphens '
@@ -91,7 +91,7 @@ def validate_account_name(account_name):
     segment and must not be able to traverse out of the API base path.
     """
     if not isinstance(account_name, str) or \
-            not ACCOUNT_NAME_PATTERN.match(account_name) or \
+            not ACCOUNT_NAME_PATTERN.fullmatch(account_name) or \
             '..' in account_name:
         raise SaaSOpticsConfigurationError(
             'Invalid `account_name` in config: it must be a single path segment '

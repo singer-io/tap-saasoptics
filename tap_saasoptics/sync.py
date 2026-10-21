@@ -3,10 +3,30 @@ import math
 import singer
 from singer import metrics, metadata, Transformer, utils
 from singer.utils import strptime_to_utc, strftime
+from tap_saasoptics.client import SaaSOpticsError
 from tap_saasoptics.transform import transform_json
 from tap_saasoptics.streams import STREAMS
 
 LOGGER = singer.get_logger()
+
+# Default hard cap on pages per window (overridable with the `max_pages` config value),
+# and extra pages allowed beyond ceil(count / limit)
+MAX_PAGES = 100000
+PAGE_SLACK = 10
+
+
+def get_max_pages(config):
+    """Return the page cap from config `max_pages`, defaulting to MAX_PAGES."""
+    value = config.get('max_pages')
+    if value is None or value == '':
+        return MAX_PAGES
+    try:
+        max_pages = int(value)
+    except (TypeError, ValueError):
+        raise ValueError('max_pages must be a positive integer, got {!r}'.format(value))
+    if max_pages < 1:
+        raise ValueError('max_pages must be a positive integer, got {!r}'.format(value))
+    return max_pages
 
 
 def write_schema(catalog, stream_name):
@@ -116,7 +136,8 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                   bookmark_type=None,
                   data_key=None,
                   id_fields=None,
-                  days_interval=None):
+                  days_interval=None,
+                  max_pages_cap=MAX_PAGES):
 
 
     # Get the latest bookmark for the stream and set the last_integer/datetime
@@ -172,7 +193,29 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
         offset = 0
         limit = 100 # Default limit for SaaSOptics API, unable to change this in v1.0
         total_records = 0
+        seen_urls = set()
+        max_pages = max_pages_cap
+        count_max_pages = None # page bound derived from the server-reported count
         while next_url is not None:
+            # Guard against a server that never stops paginating. Fail loudly rather than
+            # moving on, which would leave a silent gap in the extracted data.
+            if next_url in seen_urls:
+                raise SaaSOpticsError(
+                    'Stream {}: next URL repeated on page {}, aborting sync to avoid an '
+                    'infinite pagination loop: {}'.format(stream_name, page, next_url))
+            if page > max_pages:
+                if count_max_pages is not None and count_max_pages <= max_pages_cap:
+                    raise SaaSOpticsError(
+                        'Stream {}: API returned more than {} pages, which exceeds the '
+                        'number implied by its reported record count. Aborting sync; '
+                        'this indicates an API issue, and raising max_pages will not '
+                        'help.'.format(stream_name, max_pages))
+                raise SaaSOpticsError(
+                    'Stream {}: reached the max_pages limit ({}) before pagination '
+                    'finished. Aborting sync to avoid incomplete extraction. Increase '
+                    'max_pages in the config if this stream legitimately has that much '
+                    'data, otherwise investigate the API.'.format(stream_name, max_pages))
+            seen_urls.add(next_url)
             # Need URL querystring for 1st page; subsequent pages provided by next_url
             # querystring: Squash query params into string
             if page == 1 and not params == {}:
@@ -238,6 +281,10 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 # The upstream response controls this URL; make sure it still
                 # points inside the SaaSOptics API before using or logging it.
                 next_url = client.validate_url(next_url)
+            # Bound pages by the server-reported count (plus slack for records added mid-sync)
+            if isinstance(total_records, int) and total_records > 0:
+                count_max_pages = math.ceil(total_records / limit) + PAGE_SLACK
+                max_pages = min(max_pages_cap, count_max_pages)
 
             # Update the state with the max_bookmark_value for the stream
             if bookmark_field:
@@ -299,6 +346,8 @@ def sync(client, config, catalog, state):
     if not selected_streams:
         return
 
+    max_pages_cap = get_max_pages(config)
+
     # Loop through selected_streams
     for stream_name in selected_streams:
         LOGGER.info('START Syncing: {}'.format(stream_name))
@@ -321,7 +370,8 @@ def sync(client, config, catalog, state):
             bookmark_type=endpoint_config.get('bookmark_type'),
             data_key=endpoint_config.get('data_key', 'results'),
             id_fields=endpoint_config.get('key_properties'),
-            days_interval=int(config.get('date_window_size', '60')))
+            days_interval=int(config.get('date_window_size', '60')),
+            max_pages_cap=max_pages_cap)
 
         update_currently_syncing(state, None)
         LOGGER.info('FINISHED Syncing: {}, total_records: {}'.format(
