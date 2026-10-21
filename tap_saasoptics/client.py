@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import backoff
 import requests
@@ -125,7 +125,8 @@ def validate_url(url, base_url):
         and hostname == base.hostname
         and port in (None, 443))
     is_within_base_path = (
-        parts.path == base.path or parts.path.startswith(base.path + '/'))
+        (parts.path == base.path or parts.path.startswith(base.path + '/'))
+        and '..' not in unquote(parts.path).replace('\\', '/').split('/'))
 
     if not (is_same_origin and is_within_base_path):
         raise SaaSOpticsUnsafeUrlError(

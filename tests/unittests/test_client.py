@@ -435,6 +435,9 @@ class TestValidateUrl(unittest.TestCase):
             "https://127.0.0.1/acct/api/v1.0/accounts/",
             "file:///etc/passwd",
             "https://sub.saasoptics.com/acct/api/v1.0/\x00accounts/",
+            "https://sub.saasoptics.com/acct/api/v1.0/../../other/",
+            "https://sub.saasoptics.com/acct/api/v1.0/..%2f..%2fother/",
+            "https://sub.saasoptics.com/acct/api/v1.0/%2e%2e/%2e%2e/other/",
             None,
             42,
         ]
@@ -455,8 +458,42 @@ class TestValidateUrl(unittest.TestCase):
             client.validate_url("https://evil.example.com/acct/api/v1.0/accounts/")
 
 
+class _RedirectingAdapter(requests.adapters.HTTPAdapter):
+    """Transport that answers every request with a 302 to an internal host."""
+
+    def __init__(self):
+        super().__init__()
+        self.urls = []
+
+    def send(self, request, **kwargs):  # pylint: disable=arguments-differ
+        self.urls.append(request.url)
+        response = requests.Response()
+        response.status_code = 302
+        response.headers["Location"] = "http://169.254.169.254/latest/meta-data/"
+        response.request = request
+        response.url = request.url
+        return response
+
+
 class TestRedirectsAreNotFollowed(unittest.TestCase):
     """Redirects must never be followed (SSRF hardening)."""
+
+    def test_real_session_does_not_follow_redirects(self):
+        """End to end through requests.Session: a 302 raises and no second request is sent."""
+        client = SaaSOpticsClient("token", "acct", "sub", "ua")
+        adapter = _RedirectingAdapter()
+        client._SaaSOpticsClient__session.mount("https://", adapter)
+
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            client.check_token()
+        client._SaaSOpticsClient__verified = True
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            client.get(path="invoices", endpoint="invoices", allow_redirects=True)
+
+        self.assertEqual(adapter.urls, [
+            "https://sub.saasoptics.com/acct/api/v1.0/billing_descriptions/",
+            "https://sub.saasoptics.com/acct/api/v1.0/invoices/",
+        ])
 
     def test_raise_for_redirect_raises_on_3xx(self):
         for status_code in (301, 302, 303, 307, 308):
