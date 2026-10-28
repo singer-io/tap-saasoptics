@@ -8,7 +8,7 @@ from singer import metrics
 import singer
 
 API_VERSION = 'v1.0'
-# Django's DomainNameValidator.ascii_only_hostname_re:
+# Grabbed this regex from Django because it does what we need:
 # https://github.com/django/django/blob/5.2.9/django/core/validators.py#L87
 SERVER_SUBDOMAIN_RE = re.compile(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?')
 ACCOUNT_NAME_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
