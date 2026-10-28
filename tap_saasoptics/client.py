@@ -8,8 +8,9 @@ from singer import metrics
 import singer
 
 API_VERSION = 'v1.0'
-# DNS label syntax: RFC 1035 section 2.3.1, with the leading digit allowed by RFC 1123 section 2.1.
-SERVER_SUBDOMAIN_RE = re.compile(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?')
+# Django's DomainNameValidator.ascii_only_hostname_re:
+# https://github.com/django/django/blob/5.2.9/django/core/validators.py#L87
+SERVER_SUBDOMAIN_RE = re.compile(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?')
 ACCOUNT_NAME_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
 LOGGER = singer.get_logger()
 
