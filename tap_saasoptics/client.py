@@ -8,8 +8,7 @@ from singer import metrics
 import singer
 
 API_VERSION = 'v1.0'
-# Config values interpolated into the base URL: a single DNS label and a single
-# path segment, so neither can change the host or escape the API path.
+# DNS label syntax: RFC 1035 section 2.3.1, with the leading digit allowed by RFC 1123 section 2.1.
 SERVER_SUBDOMAIN_RE = re.compile(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?')
 ACCOUNT_NAME_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
 LOGGER = singer.get_logger()
