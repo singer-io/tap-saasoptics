@@ -12,6 +12,8 @@ from tap_saasoptics.client import (
     SaaSOpticsNotFoundError,
     SaaSOpticsInternalServiceError,
     SaaSOpticsError,
+    SaaSOpticsConfigurationError,
+    SaaSOpticsUnsafeUrlError,
     Server5xxError,
     raise_for_error,
     get_exception_for_error_code,
@@ -177,7 +179,7 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client = self._make_verified_client()
         client._SaaSOpticsClient__session = mock_session
 
-        result = client.request("GET", url="https://example.com/api/v1.0/customers/")
+        result = client.request("GET", url="https://test-subdomain.saasoptics.com/test-account/api/v1.0/customers/")
         self.assertEqual(result, {"count": 1, "results": []})
 
     @patch("tap_saasoptics.client.requests.Session")
@@ -193,7 +195,7 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client._SaaSOpticsClient__session = mock_session
 
         with self.assertRaises(Server5xxError):
-            client.request("GET", url="https://example.com/api/v1.0/customers/")
+            client.request("GET", url="https://test-subdomain.saasoptics.com/test-account/api/v1.0/customers/")
 
     @patch("tap_saasoptics.client.requests.Session")
     def test_request_raises_for_4xx_error(self, mock_session_cls):
@@ -212,7 +214,7 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client._SaaSOpticsClient__session = mock_session
 
         with self.assertRaises(SaaSOpticsError):
-            client.request("GET", url="https://example.com/api/v1.0/unknown/")
+            client.request("GET", url="https://test-subdomain.saasoptics.com/test-account/api/v1.0/unknown/")
 
     @patch("tap_saasoptics.client.requests.Session")
     def test_get_delegates_to_request(self, mock_session_cls):
@@ -227,7 +229,7 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client = self._make_verified_client()
         client._SaaSOpticsClient__session = mock_session
 
-        client.get(path="billing_descriptions", url="https://example.com/api/v1.0/billing_descriptions/")
+        client.get(path="billing_descriptions", url="https://test-subdomain.saasoptics.com/test-account/api/v1.0/billing_descriptions/")
         call_args = mock_session.request.call_args
         self.assertEqual(call_args[0][0], "GET")
 
@@ -246,7 +248,7 @@ class TestSaaSOpticsClientRequest(unittest.TestCase):
         client._SaaSOpticsClient__session.request.return_value = response
         client.check_token = MagicMock(return_value=True)
 
-        client.request("GET", url="https://example.com/api/v1.0/customers/")
+        client.request("GET", url="https://test-subdomain.saasoptics.com/test-account/api/v1.0/customers/")
 
         client.check_token.assert_called_once_with()
 
@@ -320,3 +322,102 @@ class TestClientAdditional(unittest.TestCase):
 
         self.assertEqual(result, {"ok": True})
         mock_request.assert_called_once_with("POST", path="accounts", json={"x": 1})
+
+
+class TestConfigValidation(unittest.TestCase):
+    """server_subdomain/account_name must not be able to change the request host or path."""
+
+    def test_valid_config_builds_base_url(self):
+        client = SaaSOpticsClient("token", "Acme_co.1", "MyCo-1")
+        self.assertEqual(client.base_url, "https://myco-1.saasoptics.com/Acme_co.1/api/v1.0")
+
+    def test_invalid_server_subdomain_is_rejected(self):
+        for value in ["", "evil.example.com/x?tail=", "evil.example.com", "sub:8447", "sub%2f",
+                      "user@host", "sub\n", "a b", "-sub", "sub-", "ёж", "a" * 64, None]:
+            with self.subTest(value=value):
+                with self.assertRaises(SaaSOpticsConfigurationError) as ctx:
+                    SaaSOpticsClient("token", "acct", value)
+                if value:
+                    self.assertNotIn(value, str(ctx.exception))
+
+    def test_invalid_account_name_is_rejected(self):
+        for value in ["", ".", "..", "a..b", ".acct", "acct/x", "acct?x", "acct#x", "acct%2f",
+                      "acct\n", "a b", "a" * 129, None]:
+            with self.subTest(value=value):
+                with self.assertRaises(SaaSOpticsConfigurationError):
+                    SaaSOpticsClient("token", value, "sub")
+
+
+class TestValidateUrl(unittest.TestCase):
+    """Every request URL (including upstream `next` URLs) must stay inside the API base URL."""
+
+    def setUp(self):
+        self.client = SaaSOpticsClient("token", "acct", "sub")
+
+    def test_allowed_urls(self):
+        for url in ["https://sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/accounts/?limit=100&page=2",
+                    "https://SUB.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com:443/acct/api/v1.0/accounts/"]:
+            with self.subTest(url=url):
+                self.client.validate_url(url)
+
+    def test_rejected_urls(self):
+        for url in ["http://internal.lan/subjects",
+                    "http://sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com.evil.example.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com:8447/acct/api/v1.0/accounts/",
+                    "https://user:pass@sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com\\@evil.example.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0evil/accounts/",
+                    "https://sub.saasoptics.com/other/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/../../other/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/%2e%2e/%2e%2e/other/",
+                    "file:///etc/passwd", None]:
+            with self.subTest(url=url):
+                with self.assertRaises(SaaSOpticsUnsafeUrlError):
+                    self.client.validate_url(url)
+
+    def test_request_rejects_url_before_sending(self):
+        self.client._SaaSOpticsClient__verified = True
+        session = self.client._SaaSOpticsClient__session = MagicMock()
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            self.client.get(path=None, url="https://evil.example.com/acct/api/v1.0/accounts/")
+        session.request.assert_not_called()
+
+
+class _RedirectingAdapter(requests.adapters.HTTPAdapter):
+    """Transport that answers every request with a 302 to an internal host."""
+
+    def __init__(self):
+        super().__init__()
+        self.urls = []
+
+    def send(self, request, **kwargs):  # pylint: disable=arguments-differ
+        self.urls.append(request.url)
+        response = requests.Response()
+        response.status_code = 302
+        response.headers["Location"] = "http://169.254.169.254/latest/meta-data/"
+        response.request = request
+        response.url = request.url
+        return response
+
+
+class TestRedirectsAreNotFollowed(unittest.TestCase):
+
+    def setUp(self):
+        self.client = SaaSOpticsClient("token", "acct", "sub")
+        self.adapter = _RedirectingAdapter()
+        self.client._SaaSOpticsClient__session.mount("https://", self.adapter)
+        self.client._SaaSOpticsClient__session.mount("http://", self.adapter)
+
+    def test_check_token_raises_on_redirect(self):
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            self.client.check_token()
+        self.assertEqual(len(self.adapter.urls), 1)
+
+    def test_request_raises_on_redirect_even_if_caller_allows_redirects(self):
+        self.client._SaaSOpticsClient__verified = True
+        with self.assertRaises(SaaSOpticsUnsafeUrlError):
+            self.client.get(path="accounts", allow_redirects=True)
+        self.assertEqual(self.adapter.urls, ["https://sub.saasoptics.com/acct/api/v1.0/accounts/"])

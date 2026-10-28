@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+  * Bound the pagination loop (repeated `next` URL / configurable `max_pages` cap) to prevent infinite pagination [#20](https://github.com/singer-io/tap-saasoptics/pull/20)
+  * Fix SSRF: validate `server_subdomain`/`account_name`, only request URLs under the API base URL, don't follow redirects, and don't log response bodies [#17](https://github.com/singer-io/tap-saasoptics/pull/17)
+
 ## 1.2.0
   * Upgrade python version to 3.12 [#12](https://github.com/singer-io/tap-saasoptics/pull/12)
   * Add mock-integration tests

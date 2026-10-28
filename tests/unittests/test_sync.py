@@ -672,3 +672,41 @@ class TestGetMaxPages(unittest.TestCase):
         config = {"start_date": "2025-01-01T00:00:00Z", "max_pages": "42"}
         sync(client=MagicMock(), config=config, catalog=catalog, state={})
         self.assertEqual(mock_endpoint.call_args.kwargs["max_pages_cap"], 42)
+
+
+class TestSyncEndpointDoesNotLogResponseBody(unittest.TestCase):
+    """The untransformable response body must never reach the tenant log."""
+
+    @patch("tap_saasoptics.sync.LOGGER.info")
+    @patch("tap_saasoptics.sync.transform_json", return_value=[])
+    @patch("tap_saasoptics.sync.write_schema")
+    @patch("tap_saasoptics.sync.utils.now")
+    def test_response_body_is_not_logged(
+        self, mock_now, _mock_write_schema, _mock_transform_json, mock_log_info
+    ):
+        mock_now.return_value = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        secret = "internal-service-secret"
+        client = MagicMock()
+        client.base_url = "https://sub.saasoptics.com/acct/api/v1.0"
+        client.get.return_value = [secret]
+
+        sync_endpoint(
+            client=client,
+            catalog=MagicMock(),
+            state={},
+            start_date="2025-01-01T00:00:00Z",
+            stream_name="accounts",
+            path="accounts",
+            endpoint_config={"key_properties": ["id"]},
+            static_params={},
+            bookmark_query_field_from=None,
+            bookmark_query_field_to=None,
+            bookmark_field=None,
+            bookmark_type=None,
+            data_key="results",
+            id_fields=["id"],
+            days_interval=60,
+        )
+
+        logged = " ".join(str(call) for call in mock_log_info.call_args_list)
+        self.assertNotIn(secret, logged)

@@ -1,3 +1,6 @@
+import re
+from urllib.parse import unquote, urlsplit
+
 import backoff
 import requests
 from requests.exceptions import ConnectionError
@@ -5,6 +8,10 @@ from singer import metrics
 import singer
 
 API_VERSION = 'v1.0'
+# Grabbed this regex from Django because it does what we need:
+# https://github.com/django/django/blob/5.2.9/django/core/validators.py#L87
+SERVER_SUBDOMAIN_RE = re.compile(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?')
+ACCOUNT_NAME_RE = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
 LOGGER = singer.get_logger()
 
 
@@ -48,6 +55,14 @@ class SaaSOpticsInternalServiceError(SaaSOpticsError):
     pass
 
 
+class SaaSOpticsConfigurationError(SaaSOpticsError):
+    pass
+
+
+class SaaSOpticsUnsafeUrlError(SaaSOpticsError):
+    pass
+
+
 ERROR_CODE_EXCEPTION_MAPPING = {
     400: SaaSOpticsBadRequestError,
     401: SaaSOpticsUnauthorizedError,
@@ -62,6 +77,10 @@ def get_exception_for_error_code(error_code):
     return ERROR_CODE_EXCEPTION_MAPPING.get(error_code, SaaSOpticsError)
 
 def raise_for_error(response):
+    # Redirects are not followed, and raise_for_status() ignores 3xx.
+    if 300 <= response.status_code < 400:
+        raise SaaSOpticsUnsafeUrlError(
+            'Refusing to follow a redirect (status_code = {}).'.format(response.status_code))
     try:
         response.raise_for_status()
     except (requests.HTTPError, requests.ConnectionError) as error:
@@ -95,6 +114,16 @@ class SaaSOpticsClient(object):
                  account_name,
                  server_subdomain,
                  user_agent=None):
+        if not isinstance(server_subdomain, str) or \
+                not SERVER_SUBDOMAIN_RE.fullmatch(server_subdomain):
+            raise SaaSOpticsConfigurationError(
+                'Invalid `server_subdomain`: must be a single hostname label '
+                '(letters, digits and hyphens only).')
+        if not isinstance(account_name, str) or \
+                not ACCOUNT_NAME_RE.fullmatch(account_name) or '..' in account_name:
+            raise SaaSOpticsConfigurationError(
+                'Invalid `account_name`: must be a single URL path segment '
+                '(letters, digits, ".", "_" and "-" only).')
         self.__token = token
         self.__account_name = account_name
         self.__server_subdomain = server_subdomain
@@ -102,7 +131,19 @@ class SaaSOpticsClient(object):
         self.__session = requests.Session()
         self.__verified = False
         self.base_url = 'https://{}.saasoptics.com/{}/api/{}'.format(
-            server_subdomain, account_name, API_VERSION)
+            server_subdomain.lower(), account_name, API_VERSION)
+
+    def validate_url(self, url):
+        # Every request URL, including the upstream-controlled pagination `next`
+        # URLs, must stay on the API host and under the API base path.
+        base = urlsplit(self.base_url)
+        parts = urlsplit(url) if isinstance(url, str) else None
+        if parts is None or parts.scheme != 'https' or \
+                parts.netloc.lower() not in (base.netloc, base.netloc + ':443') or \
+                not parts.path.startswith(base.path + '/') or \
+                '..' in unquote(parts.path).replace('\\', '/').split('/'):
+            raise SaaSOpticsUnsafeUrlError(
+                'Refusing to request a URL outside of the SaaSOptics API base URL.')
 
     def __enter__(self):
         self.__verified = self.check_token()
@@ -126,7 +167,8 @@ class SaaSOpticsClient(object):
         response = self.__session.get(
             # Simple endpoint that returns 1 Account record (to check API/token access):
             url='{}/{}/'.format(self.base_url, 'billing_descriptions'),
-            headers=headers)
+            headers=headers,
+            allow_redirects=False)
         if response.status_code != 200:
             LOGGER.error('Error status_code = {}'.format(response.status_code))
             raise_for_error(response)
@@ -148,6 +190,7 @@ class SaaSOpticsClient(object):
 
         if not url and path:
             url = '{}/{}/'.format(self.base_url, path)
+        self.validate_url(url)
 
         if 'endpoint' in kwargs:
             endpoint = kwargs['endpoint']
@@ -165,6 +208,8 @@ class SaaSOpticsClient(object):
 
         if method == 'POST':
             kwargs['headers']['Content-Type'] = 'application/json'
+
+        kwargs['allow_redirects'] = False
 
         with metrics.http_request_timer(endpoint) as timer:
             response = self.__session.request(method, url, **kwargs)

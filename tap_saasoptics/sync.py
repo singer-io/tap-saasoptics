@@ -253,7 +253,8 @@ def sync_endpoint(client, #pylint: disable=too-many-branches
                 transformed_data = transform_json(data, stream_name, data_key)
             # LOGGER.info('transformed_data = {}'.format(transformed_data))  # TESTING, comment out
             if not transformed_data or transformed_data is None:
-                LOGGER.info('No transformed data for data = {}'.format(data))
+                # Don't log the response body; only bounded metadata.
+                LOGGER.info('No transformed data for stream {}, page {}'.format(stream_name, page))
                 total_records = 0
                 break # No data results
 
