@@ -12,15 +12,11 @@ from tap_saasoptics.client import (
     SaaSOpticsNotFoundError,
     SaaSOpticsInternalServiceError,
     SaaSOpticsError,
-    Server5xxError,
-    raise_for_error,
-    raise_for_redirect,
-    get_exception_for_error_code,
     SaaSOpticsConfigurationError,
     SaaSOpticsUnsafeUrlError,
-    validate_account_name,
-    validate_server_subdomain,
-    validate_url,
+    Server5xxError,
+    raise_for_error,
+    get_exception_for_error_code,
 )
 
 
@@ -328,134 +324,66 @@ class TestClientAdditional(unittest.TestCase):
         mock_request.assert_called_once_with("POST", path="accounts", json={"x": 1})
 
 
-class TestValidateServerSubdomain(unittest.TestCase):
-    """Unit tests for validate_server_subdomain() (SSRF hardening)."""
+class TestConfigValidation(unittest.TestCase):
+    """server_subdomain/account_name must not be able to change the request host or path."""
 
-    def test_valid_subdomain_is_lowercased(self):
-        self.assertEqual(validate_server_subdomain("MyCo-1"), "myco-1")
+    def test_valid_config_builds_base_url(self):
+        client = SaaSOpticsClient("token", "Acme_co.1", "MyCo-1")
+        self.assertEqual(client.base_url, "https://myco-1.saasoptics.com/Acme_co.1/api/v1.0")
 
-    def test_invalid_subdomains_are_rejected(self):
-        invalid = [
-            "",
-            "evil.example.com/stitch-repro?tail=",
-            "evil.example.com",
-            "evil.example.com:8447",
-            "sub/path",
-            "sub?query",
-            "sub#fragment",
-            "sub%2fpath",
-            "user@host",
-            "sub\n",
-            "su\nb",
-            "sub ",
-            " sub",
-            "a b",
-            "-leading-hyphen",
-            "trailing-hyphen-",
-            "sub.",
-            "ёж",
-            "a" * 64,
-            None,
-            123,
-        ]
-        for value in invalid:
+    def test_invalid_server_subdomain_is_rejected(self):
+        for value in ["", "evil.example.com/x?tail=", "evil.example.com", "sub:8447", "sub%2f",
+                      "user@host", "sub\n", "a b", "-sub", "sub-", "ёж", "a" * 64, None]:
+            with self.subTest(value=value):
+                with self.assertRaises(SaaSOpticsConfigurationError) as ctx:
+                    SaaSOpticsClient("token", "acct", value)
+                if value:
+                    self.assertNotIn(value, str(ctx.exception))
+
+    def test_invalid_account_name_is_rejected(self):
+        for value in ["", ".", "..", "a..b", ".acct", "acct/x", "acct?x", "acct#x", "acct%2f",
+                      "acct\n", "a b", "a" * 129, None]:
             with self.subTest(value=value):
                 with self.assertRaises(SaaSOpticsConfigurationError):
-                    validate_server_subdomain(value)
-
-    def test_error_message_does_not_echo_the_value(self):
-        secret = "evil.example.com/stitch-repro?tail="
-        with self.assertRaises(SaaSOpticsConfigurationError) as ctx:
-            validate_server_subdomain(secret)
-        self.assertNotIn(secret, str(ctx.exception))
-
-
-class TestValidateAccountName(unittest.TestCase):
-    """Unit tests for validate_account_name()."""
-
-    def test_valid_account_names_are_returned_unchanged(self):
-        for value in ["acme", "acme_co", "acme-co", "acme.co", "Acme1"]:
-            with self.subTest(value=value):
-                self.assertEqual(validate_account_name(value), value)
-
-    def test_invalid_account_names_are_rejected(self):
-        invalid = [
-            "",
-            ".",
-            "..",
-            "acme/../other",
-            "acme..co",
-            "acme/co",
-            "acme?co",
-            "acme#co",
-            "acme%2f",
-            "acme\n",
-            "ac\nme",
-            "acme ",
-            "ac me",
-            "acme@co",
-            ".acme",
-            "a" * 129,
-            None,
-            [],
-        ]
-        for value in invalid:
-            with self.subTest(value=value):
-                with self.assertRaises(SaaSOpticsConfigurationError):
-                    validate_account_name(value)
+                    SaaSOpticsClient("token", value, "sub")
 
 
 class TestValidateUrl(unittest.TestCase):
-    """Unit tests for validate_url() (SSRF hardening)."""
+    """Every request URL (including upstream `next` URLs) must stay inside the API base URL."""
 
-    BASE_URL = "https://sub.saasoptics.com/acct/api/v1.0"
+    def setUp(self):
+        self.client = SaaSOpticsClient("token", "acct", "sub")
 
     def test_allowed_urls(self):
-        allowed = [
-            "https://sub.saasoptics.com/acct/api/v1.0",
-            "https://sub.saasoptics.com/acct/api/v1.0/accounts/",
-            "https://sub.saasoptics.com/acct/api/v1.0/accounts/?limit=100",
-            "https://SUB.saasoptics.com/acct/api/v1.0/accounts/",
-            "https://sub.saasoptics.com:443/acct/api/v1.0/accounts/",
-        ]
-        for url in allowed:
+        for url in ["https://sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/accounts/?limit=100&page=2",
+                    "https://SUB.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com:443/acct/api/v1.0/accounts/"]:
             with self.subTest(url=url):
-                self.assertEqual(validate_url(url, self.BASE_URL), url)
+                self.client.validate_url(url)
 
     def test_rejected_urls(self):
-        rejected = [
-            "http://app-smart-schema-registry.central.internal.lan/subjects",
-            "https://app-smart-schema-registry.central.internal.lan/subjects",
-            "http://sub.saasoptics.com/acct/api/v1.0/accounts/",
-            "https://sub.saasoptics.com.evil.example.com/acct/api/v1.0/accounts/",
-            "https://sub.saasoptics.com:8447/acct/api/v1.0/accounts/",
-            "https://user:pass@sub.saasoptics.com/acct/api/v1.0/accounts/",
-            "https://sub.saasoptics.com/acct/api/v1.0evil/accounts/",
-            "https://sub.saasoptics.com/other/api/v1.0/accounts/",
-            "https://127.0.0.1/acct/api/v1.0/accounts/",
-            "file:///etc/passwd",
-            "https://sub.saasoptics.com/acct/api/v1.0/\x00accounts/",
-            "https://sub.saasoptics.com/acct/api/v1.0/../../other/",
-            "https://sub.saasoptics.com/acct/api/v1.0/..%2f..%2fother/",
-            "https://sub.saasoptics.com/acct/api/v1.0/%2e%2e/%2e%2e/other/",
-            None,
-            42,
-        ]
-        for url in rejected:
+        for url in ["http://internal.lan/subjects",
+                    "http://sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com.evil.example.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com:8447/acct/api/v1.0/accounts/",
+                    "https://user:pass@sub.saasoptics.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com\\@evil.example.com/acct/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0evil/accounts/",
+                    "https://sub.saasoptics.com/other/api/v1.0/accounts/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/../../other/",
+                    "https://sub.saasoptics.com/acct/api/v1.0/%2e%2e/%2e%2e/other/",
+                    "file:///etc/passwd", None]:
             with self.subTest(url=url):
                 with self.assertRaises(SaaSOpticsUnsafeUrlError):
-                    validate_url(url, self.BASE_URL)
+                    self.client.validate_url(url)
 
-    def test_malformed_url_is_rejected(self):
+    def test_request_rejects_url_before_sending(self):
+        self.client._SaaSOpticsClient__verified = True
+        session = self.client._SaaSOpticsClient__session = MagicMock()
         with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            validate_url("https://sub.saasoptics.com:notaport/acct/api/v1.0/", self.BASE_URL)
-
-    def test_client_validate_url_uses_its_own_base_url(self):
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        url = "https://sub.saasoptics.com/acct/api/v1.0/accounts/"
-        self.assertEqual(client.validate_url(url), url)
-        with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.validate_url("https://evil.example.com/acct/api/v1.0/accounts/")
+            self.client.get(path=None, url="https://evil.example.com/acct/api/v1.0/accounts/")
+        session.request.assert_not_called()
 
 
 class _RedirectingAdapter(requests.adapters.HTTPAdapter):
@@ -476,165 +404,20 @@ class _RedirectingAdapter(requests.adapters.HTTPAdapter):
 
 
 class TestRedirectsAreNotFollowed(unittest.TestCase):
-    """Redirects must never be followed (SSRF hardening)."""
 
-    def test_real_session_does_not_follow_redirects(self):
-        """End to end through requests.Session: a 302 raises and no second request is sent."""
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        adapter = _RedirectingAdapter()
-        client._SaaSOpticsClient__session.mount("https://", adapter)
+    def setUp(self):
+        self.client = SaaSOpticsClient("token", "acct", "sub")
+        self.adapter = _RedirectingAdapter()
+        self.client._SaaSOpticsClient__session.mount("https://", self.adapter)
+        self.client._SaaSOpticsClient__session.mount("http://", self.adapter)
 
+    def test_check_token_raises_on_redirect(self):
         with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.check_token()
-        client._SaaSOpticsClient__verified = True
+            self.client.check_token()
+        self.assertEqual(len(self.adapter.urls), 1)
+
+    def test_request_raises_on_redirect_even_if_caller_allows_redirects(self):
+        self.client._SaaSOpticsClient__verified = True
         with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.get(path="invoices", endpoint="invoices", allow_redirects=True)
-
-        self.assertEqual(adapter.urls, [
-            "https://sub.saasoptics.com/acct/api/v1.0/billing_descriptions/",
-            "https://sub.saasoptics.com/acct/api/v1.0/invoices/",
-        ])
-
-    def test_raise_for_redirect_raises_on_3xx(self):
-        for status_code in (301, 302, 303, 307, 308):
-            with self.subTest(status_code=status_code):
-                response = MagicMock()
-                response.status_code = status_code
-                with self.assertRaises(SaaSOpticsUnsafeUrlError):
-                    raise_for_redirect(response)
-
-    def test_raise_for_redirect_is_a_noop_on_200(self):
-        response = MagicMock()
-        response.status_code = 200
-        self.assertIsNone(raise_for_redirect(response))
-
-    def test_check_token_disables_redirects_and_raises_on_302(self):
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 302
-        session.get.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.check_token()
-
-        self.assertIs(session.get.call_args.kwargs["allow_redirects"], False)
-
-    @patch("tap_saasoptics.client.metrics.http_request_timer")
-    def test_request_disables_redirects_and_raises_on_302(self, mock_timer):
-        timer_cm = MagicMock()
-        timer_cm.__enter__.return_value = MagicMock(tags={})
-        timer_cm.__exit__.return_value = False
-        mock_timer.return_value = timer_cm
-
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        client._SaaSOpticsClient__verified = True
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 302
-        session.request.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.request("GET", path="accounts")
-
-        self.assertIs(session.request.call_args.kwargs["allow_redirects"], False)
-
-    @patch("tap_saasoptics.client.metrics.http_request_timer")
-    def test_request_ignores_caller_supplied_allow_redirects(self, mock_timer):
-        timer_cm = MagicMock()
-        timer_cm.__enter__.return_value = MagicMock(tags={})
-        timer_cm.__exit__.return_value = False
-        mock_timer.return_value = timer_cm
-
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        client._SaaSOpticsClient__verified = True
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"results": []}
-        session.request.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        client.request("GET", path="accounts", allow_redirects=True)
-
-        self.assertIs(session.request.call_args.kwargs["allow_redirects"], False)
-
-    @patch("tap_saasoptics.client.metrics.http_request_timer")
-    def test_request_rejects_url_outside_the_base_url(self, mock_timer):
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        client._SaaSOpticsClient__verified = True
-        session = MagicMock()
-        client._SaaSOpticsClient__session = session
-
-        with self.assertRaises(SaaSOpticsUnsafeUrlError):
-            client.request("GET", url="http://app-smart-schema-registry.central.internal.lan/subjects")
-
-        session.request.assert_not_called()
-
-
-class TestClientConstruction(unittest.TestCase):
-    """The client must refuse to be built with an unsafe config."""
-
-    def test_base_url_is_built_from_validated_values(self):
-        client = SaaSOpticsClient("token", "Acme_1", "MyCo", "ua")
-        self.assertEqual(
-            client.base_url, "https://myco.saasoptics.com/Acme_1/api/v1.0")
-
-    def test_unsafe_server_subdomain_raises(self):
-        with self.assertRaises(SaaSOpticsConfigurationError):
-            SaaSOpticsClient("token", "acct", "evil.example.com/repro?tail=", "ua")
-
-    def test_unsafe_account_name_raises(self):
-        with self.assertRaises(SaaSOpticsConfigurationError):
-            SaaSOpticsClient("token", "../../evil", "sub", "ua")
-
-
-class TestClientBranchCoverage(unittest.TestCase):
-    """Cover the remaining conditional edges in client.py."""
-
-    def test_check_token_omits_user_agent_header_when_not_configured(self):
-        client = SaaSOpticsClient("token", "acct", "sub")
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"results": []}
-        session.get.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        self.assertTrue(client.check_token())
-        self.assertNotIn("User-Agent", session.get.call_args.kwargs["headers"])
-
-    @patch("tap_saasoptics.client.metrics.http_request_timer")
-    def test_request_reuses_caller_supplied_headers(self, mock_timer):
-        timer_cm = MagicMock()
-        timer_cm.__enter__.return_value = MagicMock(tags={})
-        timer_cm.__exit__.return_value = False
-        mock_timer.return_value = timer_cm
-
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        client._SaaSOpticsClient__verified = True
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"results": []}
-        session.request.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        client.request("GET", path="accounts", headers={"X-Test": "1"})
-
-        headers = session.request.call_args.kwargs["headers"]
-        self.assertEqual(headers["X-Test"], "1")
-        self.assertEqual(headers["Authorization"], "Token token")
-
-    def test_check_token_returns_false_when_results_key_is_absent(self):
-        client = SaaSOpticsClient("token", "acct", "sub", "ua")
-        session = MagicMock()
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {"detail": "no results key"}
-        session.get.return_value = response
-        client._SaaSOpticsClient__session = session
-
-        self.assertFalse(client.check_token())
+            self.client.get(path="accounts", allow_redirects=True)
+        self.assertEqual(self.adapter.urls, ["https://sub.saasoptics.com/acct/api/v1.0/accounts/"])

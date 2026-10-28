@@ -19,6 +19,5 @@ tap_saasoptics/.vscode/settings.json
 *.ipynb
 .DS_Store
 test_configuration.py
-tap_target_commands.sh.coverage
-htmlcov/
-*.egg-info/
+tap_target_commands.sh
+.coverage
